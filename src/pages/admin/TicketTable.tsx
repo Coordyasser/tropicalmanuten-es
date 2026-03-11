@@ -1,7 +1,9 @@
 import React, { useState } from 'react'
-import { ChevronDown, ChevronRight, Eye, Loader2, RefreshCw, WifiOff } from 'lucide-react'
+import { ChevronDown, ChevronRight, Eye, Loader2, Pencil, RefreshCw, Search, Trash2, WifiOff, X } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 import type { AdminTicket } from '../../hooks/useAdminTickets'
 import type { TicketStatus } from '../../types/database'
+import EditTicketModal from './EditTicketModal'
 
 interface TicketTableProps {
   tickets: AdminTicket[]
@@ -52,25 +54,59 @@ function groupTickets(tickets: AdminTicket[]): LocationGroup[] {
   for (const t of tickets) {
     const key = `${t.project?.name ?? '—'}|${t.bloco ?? ''}|${t.unidade ?? ''}`
     if (!map.has(key)) {
-      map.set(key, {
-        key,
-        projectName: t.project?.name ?? '—',
-        unidade: t.unidade,
-        bloco: t.bloco,
-        tickets: [],
-      })
+      map.set(key, { key, projectName: t.project?.name ?? '—', unidade: t.unidade, bloco: t.bloco, tickets: [] })
     }
     map.get(key)!.tickets.push(t)
   }
   return Array.from(map.values())
 }
 
-export default function TicketTable({ tickets, loading, error, onVerTicket, onRefresh }: TicketTableProps) {
-  const [filter, setFilter]       = useState<Filter>('all')
-  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
+function applyFilters(
+  tickets: AdminTicket[],
+  statusFilter: Filter,
+  search: string,
+  dateFrom: string,
+  dateTo: string,
+): AdminTicket[] {
+  let result = statusFilter === 'all' ? tickets : tickets.filter(t => t.status === statusFilter)
 
-  const filtered = filter === 'all' ? tickets : tickets.filter(t => t.status === filter)
+  const q = search.trim().toLowerCase()
+  if (q) {
+    result = result.filter(t =>
+      (t.project?.name    ?? '').toLowerCase().includes(q) ||
+      (t.unidade          ?? '').toLowerCase().includes(q) ||
+      (t.bloco            ?? '').toLowerCase().includes(q) ||
+      (t.technician?.name ?? '').toLowerCase().includes(q) ||
+      (t.categoria        ?? '').toLowerCase().includes(q)
+    )
+  }
+
+  if (dateFrom) result = result.filter(t => t.scheduled_date >= dateFrom)
+  if (dateTo)   result = result.filter(t => t.scheduled_date <= dateTo)
+
+  return result
+}
+
+export default function TicketTable({ tickets, loading, error, onVerTicket, onRefresh }: TicketTableProps) {
+  const [filter,          setFilter]          = useState<Filter>('all')
+  const [search,          setSearch]          = useState('')
+  const [dateFrom,        setDateFrom]        = useState('')
+  const [dateTo,          setDateTo]          = useState('')
+  const [openGroups,      setOpenGroups]      = useState<Set<string>>(new Set())
+  const [editTicket,      setEditTicket]      = useState<AdminTicket | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [deleting,        setDeleting]        = useState(false)
+
+  const filtered = applyFilters(tickets, filter, search, dateFrom, dateTo)
   const groups   = groupTickets(filtered)
+
+  const hasExtraFilters = search.trim() !== '' || dateFrom !== '' || dateTo !== ''
+
+  function clearExtraFilters() {
+    setSearch('')
+    setDateFrom('')
+    setDateTo('')
+  }
 
   function toggleGroup(key: string) {
     setOpenGroups(prev => {
@@ -80,11 +116,72 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onRe
     })
   }
 
-  return (
-    <div className="flex flex-col h-full">
+  async function handleDelete(id: string) {
+    setDeleting(true)
+    await supabase.from('tickets').delete().eq('id', id)
+    setConfirmDeleteId(null)
+    setDeleting(false)
+    onRefresh()
+  }
 
-      {/* ── Filters bar ── */}
-      <div className="flex items-center justify-between mb-4">
+  return (
+    <div className="flex flex-col h-full gap-3">
+
+      {/* ── Search + Date range ── */}
+      <div className="flex gap-2 flex-wrap">
+
+        {/* Search */}
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por empreendimento, unidade, técnico, categoria..."
+            className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition"
+          />
+          {search && (
+            <button onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Date from */}
+        <div className="flex items-center gap-1.5">
+          <label className="text-xs text-slate-400 font-medium whitespace-nowrap">De</label>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition"
+          />
+        </div>
+
+        {/* Date to */}
+        <div className="flex items-center gap-1.5">
+          <label className="text-xs text-slate-400 font-medium whitespace-nowrap">Ate</label>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition"
+          />
+        </div>
+
+        {/* Clear extra filters */}
+        {hasExtraFilters && (
+          <button onClick={clearExtraFilters}
+            className="flex items-center gap-1 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-500 hover:text-red-500 hover:border-red-200 transition-colors">
+            <X className="w-3.5 h-3.5" />
+            Limpar
+          </button>
+        )}
+      </div>
+
+      {/* ── Status pills + count ── */}
+      <div className="flex items-center justify-between">
         <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
           {FILTERS.map(f => (
             <button key={f.value} onClick={() => setFilter(f.value)}
@@ -94,8 +191,8 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onRe
               {f.label}
               {f.value !== 'all' && (
                 <span className={['ml-1.5 text-xs font-bold px-1.5 py-0.5 rounded-full',
-                  f.value === 'aberto'    ? 'bg-slate-100 text-slate-600'
-                  : f.value === 'pendente'  ? 'bg-orange-100 text-orange-600'
+                  f.value === 'aberto'   ? 'bg-slate-100 text-slate-600'
+                  : f.value === 'pendente' ? 'bg-orange-100 text-orange-600'
                   : 'bg-emerald-100 text-emerald-600',
                 ].join(' ')}>
                   {tickets.filter(t => t.status === f.value).length}
@@ -142,14 +239,16 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onRe
                 <th className="px-4 py-3 font-semibold text-slate-600">Categoria</th>
                 <th className="px-4 py-3 font-semibold text-slate-600">Tecnico</th>
                 <th className="px-4 py-3 font-semibold text-slate-600">Status</th>
-                <th className="px-4 py-3 font-semibold text-slate-600 text-center">Acao</th>
+                <th className="px-4 py-3 font-semibold text-slate-600 text-center whitespace-nowrap">Acoes</th>
               </tr>
             </thead>
             <tbody>
               {groups.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-16 text-slate-400">
-                    Nenhum chamado encontrado
+                    {hasExtraFilters || filter !== 'all'
+                      ? 'Nenhum chamado encontrado para os filtros aplicados'
+                      : 'Nenhum chamado encontrado'}
                   </td>
                 </tr>
               ) : groups.map(group => {
@@ -177,9 +276,7 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onRe
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-semibold text-slate-800">{group.projectName}</p>
-                        {locationLabel && (
-                          <p className="text-xs text-slate-400 mt-0.5">{locationLabel}</p>
-                        )}
+                        {locationLabel && <p className="text-xs text-slate-400 mt-0.5">{locationLabel}</p>}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
@@ -188,12 +285,12 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onRe
                       </td>
                       <td className="px-4 py-3" colSpan={4}>
                         <div className="flex gap-1.5 flex-wrap">
-                          {counts.aberto    > 0 && (
+                          {counts.aberto > 0 && (
                             <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
                               {counts.aberto} aberto{counts.aberto > 1 ? 's' : ''}
                             </span>
                           )}
-                          {counts.pendente  > 0 && (
+                          {counts.pendente > 0 && (
                             <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">
                               {counts.pendente} pendente{counts.pendente > 1 ? 's' : ''}
                             </span>
@@ -234,11 +331,39 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onRe
                           <StatusBadge status={ticket.status} />
                         </td>
                         <td className="px-4 py-2.5 text-center">
-                          <button onClick={e => { e.stopPropagation(); onVerTicket(ticket) }}
-                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg transition-colors text-xs font-medium">
-                            <Eye className="w-3.5 h-3.5" />
-                            Ver
-                          </button>
+                          {confirmDeleteId === ticket.id ? (
+                            /* ── Inline delete confirm ── */
+                            <div className="flex items-center justify-center gap-1.5">
+                              <span className="text-xs text-red-600 font-medium whitespace-nowrap">Excluir?</span>
+                              <button disabled={deleting} onClick={e => { e.stopPropagation(); handleDelete(ticket.id) }}
+                                className="text-xs font-semibold text-white bg-red-500 hover:bg-red-600 disabled:opacity-60 px-2 py-1 rounded-lg transition-colors">
+                                {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Sim'}
+                              </button>
+                              <button onClick={e => { e.stopPropagation(); setConfirmDeleteId(null) }}
+                                className="text-xs font-medium text-slate-500 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-100 transition-colors">
+                                Nao
+                              </button>
+                            </div>
+                          ) : (
+                            /* ── Normal action buttons ── */
+                            <div className="flex items-center justify-center gap-1">
+                              <button onClick={e => { e.stopPropagation(); onVerTicket(ticket) }}
+                                title="Ver detalhes"
+                                className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={e => { e.stopPropagation(); setEditTicket(ticket) }}
+                                title="Editar"
+                                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={e => { e.stopPropagation(); setConfirmDeleteId(ticket.id) }}
+                                title="Excluir"
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -250,6 +375,12 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onRe
           </table>
         )}
       </div>
+
+      <EditTicketModal
+        ticket={editTicket}
+        onClose={() => setEditTicket(null)}
+        onSuccess={() => { setEditTicket(null); onRefresh() }}
+      />
     </div>
   )
 }

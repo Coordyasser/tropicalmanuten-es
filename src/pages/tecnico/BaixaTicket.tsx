@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   AlertCircle, ArrowLeft, Camera, CheckCircle2, Clock,
-  Loader2, MapPin, X,
+  Loader2, Lock, MapPin, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import SignatureCanvas from '../../components/SignatureCanvas'
@@ -62,6 +62,8 @@ interface TicketItemProps {
 
 function TicketItem({ ticket, form, sigRef, onChange }: TicketItemProps) {
   const photoInputRef = useRef<HTMLInputElement>(null)
+  const isConcluido   = ticket.status === 'concluido'   // original status from DB
+  const isPendente    = ticket.status === 'pendente'     // original status from DB
 
   function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -73,6 +75,41 @@ function TicketItem({ ticket, form, sigRef, onChange }: TicketItemProps) {
     if (photoInputRef.current) photoInputRef.current.value = ''
   }
 
+  // ── Read-only view for already-concluded tickets ───────────────────────────
+  if (isConcluido) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden opacity-75">
+        {/* Header */}
+        <div className="px-4 pt-4 pb-3 border-b border-slate-50 flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Descricao</p>
+            <p className="text-slate-700 text-sm leading-relaxed">{ticket.description}</p>
+            {ticket.categoria && (
+              <span className="inline-block mt-1.5 text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
+                {ticket.categoria}
+              </span>
+            )}
+          </div>
+          {/* Lock badge */}
+          <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full">
+            <Lock className="w-3 h-3" />
+            Concluido
+          </span>
+        </div>
+        {/* Existing report */}
+        {ticket.report && (
+          <div className="px-4 py-3">
+            <p className="text-xs font-semibold text-slate-500 mb-1.5">Relatorio</p>
+            <pre className="text-xs text-slate-500 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-xl p-3">
+              {ticket.report}
+            </pre>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Editable view (aberto or pendente) ────────────────────────────────────
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
 
@@ -87,33 +124,37 @@ function TicketItem({ ticket, form, sigRef, onChange }: TicketItemProps) {
         )}
       </div>
 
+      {/* Historico anterior — para tickets pendentes, sempre visivel */}
+      {isPendente && ticket.report && (
+        <div className="px-4 pt-3">
+          <p className="text-xs font-semibold text-slate-500 mb-1.5">Historico anterior</p>
+          <pre className="text-[11px] text-slate-400 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-xl p-3">
+            {ticket.report}
+          </pre>
+        </div>
+      )}
+
       {/* Status */}
       <div className="px-4 py-3">
         <p className="text-xs font-semibold text-slate-600 mb-2">Status</p>
         <StatusSelector value={form.status} onChange={v => onChange({ status: v, changed: true })} />
       </div>
 
-      {/* Observacao */}
+      {/* Observacao — nova entrada sempre vazia */}
       <div className="px-4 pb-3">
-          <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-            Observacao
-            {form.status === 'pendente' && (
-              <span className="ml-1 font-normal text-slate-400">(sera adicionada ao historico)</span>
-            )}
-          </label>
-          <textarea rows={3} value={form.observacao}
-            onChange={e => onChange({ observacao: e.target.value, changed: true })}
-            placeholder={form.status === 'pendente' ? 'Ex: Aguardando material...' : 'O que foi realizado...'}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 resize-none transition" />
-          {form.status === 'pendente' && ticket.report && (
-            <details className="mt-2">
-              <summary className="text-[11px] text-slate-400 cursor-pointer select-none">Ver historico anterior</summary>
-              <pre className="text-[11px] text-slate-400 mt-1 whitespace-pre-wrap leading-relaxed">{ticket.report}</pre>
-            </details>
+        <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+          Observacao
+          {form.status === 'pendente' && (
+            <span className="ml-1 font-normal text-slate-400">(sera adicionada ao historico)</span>
           )}
+        </label>
+        <textarea rows={3} value={form.observacao}
+          onChange={e => onChange({ observacao: e.target.value, changed: true })}
+          placeholder={form.status === 'pendente' ? 'Ex: Aguardando material...' : 'O que foi realizado...'}
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 resize-none transition" />
       </div>
 
-      {/* Foto + Assinatura — apenas quando Concluido */}
+      {/* Foto + Assinatura — apenas quando Concluido (selecionado) */}
       {form.status === 'concluido' && (
         <>
           {/* Foto */}
@@ -159,12 +200,13 @@ export default function BaixaTicket() {
   const location = useLocation()
   const state    = location.state as LocationState | null
 
-  // Map of signature canvas refs, one per ticket
   const sigRefs = useRef<Map<string, SignatureCanvasHandle | null>>(new Map())
 
   const [forms, setForms] = useState<Map<string, TicketForm>>(() => {
     const m = new Map<string, TicketForm>()
     for (const t of state?.tickets ?? []) {
+      // Already-concluded tickets get their original status (read-only view will render instead)
+      // Aberto tickets default to 'concluido' so the tech must consciously switch to 'pendente'
       const initial: TicketStatus = t.status === 'aberto' ? 'concluido' : t.status
       m.set(t.id, { status: initial, observacao: '', changed: false, photoFile: null, photoPreview: null })
     }
@@ -183,13 +225,16 @@ export default function BaixaTicket() {
     )
   }
 
-  const tickets      = state.tickets
-  const first        = tickets[0]
-  const locationName = first.project?.name ?? '—'
+  const tickets        = state.tickets
+  const first          = tickets[0]
+  const locationName   = first.project?.name ?? '—'
   const locationDetail = [
     first.unidade ? `Unid. ${first.unidade}` : null,
     first.bloco   ? `Bl. ${first.bloco}`     : null,
   ].filter(Boolean).join(' / ')
+
+  // Only show Finalizar when there are editable (non-concluded) tickets
+  const hasEditable = tickets.some(t => t.status !== 'concluido')
 
   function updateForm(id: string, patch: Partial<TicketForm>) {
     setForms(prev => { const m = new Map(prev); m.set(id, { ...prev.get(id)!, ...patch }); return m })
@@ -198,7 +243,7 @@ export default function BaixaTicket() {
   async function handleFinalizar() {
     setSubmitting(true)
     setSubmitError(null)
-    const changed = tickets.filter(t => forms.get(t.id)?.changed)
+    const changed = tickets.filter(t => t.status !== 'concluido' && forms.get(t.id)?.changed)
 
     for (const ticket of changed) {
       const form      = forms.get(ticket.id)!
@@ -215,19 +260,13 @@ export default function BaixaTicket() {
       // ── Photo upload (only on concluido) ────────────────────────────────────
       let photoUrl: string | null = ticket.photo_url
       if (form.status === 'concluido' && form.photoFile) {
-        const ext = (form.photoFile.name.split('.').pop() ?? 'jpg').split('?')[0]
+        const ext  = (form.photoFile.name.split('.').pop() ?? 'jpg').split('?')[0]
         const path = `tickets/${ticket.id}/photo.${ext}`
         const { data: upd, error: upe } = await supabase.storage
           .from('photos')
           .upload(path, form.photoFile, { upsert: true, contentType: form.photoFile.type || 'image/jpeg' })
-        if (upe) {
-          setSubmitError(`Erro ao enviar foto: ${upe.message}`)
-          setSubmitting(false)
-          return
-        }
-        if (upd) {
-          photoUrl = supabase.storage.from('photos').getPublicUrl(upd.path).data.publicUrl
-        }
+        if (upe) { setSubmitError(`Erro ao enviar foto: ${upe.message}`); setSubmitting(false); return }
+        if (upd)  { photoUrl = supabase.storage.from('photos').getPublicUrl(upd.path).data.publicUrl }
       }
 
       // ── Signature upload (only on concluido) ────────────────────────────────
@@ -238,14 +277,8 @@ export default function BaixaTicket() {
         const { data: sigd, error: sige } = await supabase.storage
           .from('photos')
           .upload(`tickets/${ticket.id}/signature.png`, blob, { upsert: true, contentType: 'image/png' })
-        if (sige) {
-          setSubmitError(`Erro ao enviar assinatura: ${sige.message}`)
-          setSubmitting(false)
-          return
-        }
-        if (sigd) {
-          signatureUrl = supabase.storage.from('photos').getPublicUrl(sigd.path).data.publicUrl
-        }
+        if (sige) { setSubmitError(`Erro ao enviar assinatura: ${sige.message}`); setSubmitting(false); return }
+        if (sigd)  { signatureUrl = supabase.storage.from('photos').getPublicUrl(sigd.path).data.publicUrl }
       }
 
       // ── Save ────────────────────────────────────────────────────────────────
@@ -260,6 +293,8 @@ export default function BaixaTicket() {
         .eq('id', ticket.id)
       if (error) { setSubmitError(error.message); setSubmitting(false); return }
     }
+
+    // ── Redirect back to dashboard on success ───────────────────────────────
     navigate('/tecnico', { replace: true })
   }
 
@@ -316,14 +351,17 @@ export default function BaixaTicket() {
         )}
       </main>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm border-t border-slate-200 p-4">
-        <button type="button" disabled={submitting} onClick={handleFinalizar}
-          className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-base rounded-2xl py-4 shadow-lg shadow-emerald-500/30 transition-all">
-          {submitting
-            ? <><Loader2 className="w-5 h-5 animate-spin" /> Salvando...</>
-            : <><CheckCircle2 className="w-5 h-5" /> FINALIZAR</>}
-        </button>
-      </div>
+      {/* Finalizar — hidden when all tickets are already concluded */}
+      {hasEditable && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm border-t border-slate-200 p-4">
+          <button type="button" disabled={submitting} onClick={handleFinalizar}
+            className="w-full flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold text-base rounded-2xl py-4 shadow-lg shadow-emerald-500/30 transition-all">
+            {submitting
+              ? <><Loader2 className="w-5 h-5 animate-spin" /> Salvando...</>
+              : <><CheckCircle2 className="w-5 h-5" /> FINALIZAR</>}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

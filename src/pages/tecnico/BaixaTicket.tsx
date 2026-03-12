@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   AlertCircle, ArrowLeft, Camera, CheckCircle2, Clock,
-  Loader2, Lock, MapPin, X,
+  Loader2, Lock, MapPin, Timer, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import SignatureCanvas from '../../components/SignatureCanvas'
@@ -32,6 +32,33 @@ function buildReport(newObs: string, old: string | null): string {
   return old ? `${entry}\n\n${old}` : entry
 }
 
+/** Combine scheduled_date + scheduled_time into a Date, or midnight if no time. */
+function parseScheduledAt(date: string, time: string | null): Date {
+  return time ? new Date(`${date}T${time}:00`) : new Date(`${date}T00:00:00`)
+}
+
+/** Format elapsed milliseconds as "Xh Ym" or "Ym" or "< 1min". */
+function formatElapsed(startAt: Date, endAt: Date): string {
+  const diffMs = endAt.getTime() - startAt.getTime()
+  if (diffMs < 0) return '—'
+  const totalMins = Math.floor(diffMs / 60_000)
+  if (totalMins < 1) return '< 1min'
+  const h = Math.floor(totalMins / 60)
+  const m = totalMins % 60
+  return h === 0 ? `${m}min` : m === 0 ? `${h}h` : `${h}h ${m}min`
+}
+
+/** Derive the most-recent editable ticket id among non-concluded tickets. */
+function mostRecentEditableId(tickets: TicketWithRelations[]): string | null {
+  const editable = tickets.filter(t => t.status !== 'concluido')
+  if (editable.length === 0) return null
+  return editable.reduce((best, t) => {
+    const bKey = best.scheduled_date + (best.scheduled_time ?? '')
+    const tKey = t.scheduled_date   + (t.scheduled_time   ?? '')
+    return tKey >= bKey ? t : best
+  }).id
+}
+
 // ── StatusSelector ────────────────────────────────────────────────────────────
 const STATUS_OPTS: { v: TicketStatus; label: string; active: string; dot: string }[] = [
   { v: 'pendente',  label: 'Pendente',  active: 'border-orange-400 bg-orange-50 text-orange-700',    dot: 'bg-orange-400'  },
@@ -52,18 +79,43 @@ function StatusSelector({ value, onChange }: { value: TicketStatus; onChange: (s
   )
 }
 
+// ── ElapsedBadge ──────────────────────────────────────────────────────────────
+function ElapsedBadge({ ticket }: { ticket: TicketWithRelations }) {
+  const [, tick] = useState(0)
+  const startAt  = parseScheduledAt(ticket.scheduled_date, ticket.scheduled_time)
+  const isFixed  = Boolean(ticket.completed_at)
+
+  useEffect(() => {
+    if (isFixed) return                                    // static duration, no interval
+    const id = setInterval(() => tick(n => n + 1), 60_000)
+    return () => clearInterval(id)
+  }, [isFixed])
+
+  const endAt   = isFixed ? new Date(ticket.completed_at!) : new Date()
+  const label   = formatElapsed(startAt, endAt)
+  const caption = isFixed ? 'Duração total' : 'Duração'
+
+  return (
+    <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 rounded-full px-2.5 py-1 text-[11px] font-semibold shrink-0">
+      <Timer className="w-3 h-3" />
+      {caption}: {label}
+    </div>
+  )
+}
+
 // ── TicketItem ────────────────────────────────────────────────────────────────
 interface TicketItemProps {
   ticket: TicketWithRelations
   form: TicketForm
   sigRef: React.Ref<SignatureCanvasHandle>
   onChange: (patch: Partial<TicketForm>) => void
+  isQueueLocked: boolean   // true = pending but blocked by a more recent ticket
 }
 
-function TicketItem({ ticket, form, sigRef, onChange }: TicketItemProps) {
+function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketItemProps) {
   const photoInputRef = useRef<HTMLInputElement>(null)
-  const isConcluido   = ticket.status === 'concluido'   // original status from DB
-  const isPendente    = ticket.status === 'pendente'     // original status from DB
+  const isConcluido   = ticket.status === 'concluido'
+  const isPendente    = ticket.status === 'pendente'
 
   function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -75,11 +127,10 @@ function TicketItem({ ticket, form, sigRef, onChange }: TicketItemProps) {
     if (photoInputRef.current) photoInputRef.current.value = ''
   }
 
-  // ── Read-only view for already-concluded tickets ───────────────────────────
+  // ── Read-only: already concluded ──────────────────────────────────────────
   if (isConcluido) {
     return (
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden opacity-75">
-        {/* Header */}
         <div className="px-4 pt-4 pb-3 border-b border-slate-50 flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Descricao</p>
@@ -90,15 +141,20 @@ function TicketItem({ ticket, form, sigRef, onChange }: TicketItemProps) {
               </span>
             )}
           </div>
-          {/* Lock badge */}
           <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full">
             <Lock className="w-3 h-3" />
             Concluido
           </span>
         </div>
-        {/* Existing report */}
+        <div className="px-4 py-3 flex flex-wrap gap-2">
+          <div className="inline-flex items-center gap-1.5 text-xs text-slate-400">
+            <Clock className="w-3 h-3" />{formatDate(ticket.scheduled_date)}
+            {ticket.scheduled_time && ` às ${ticket.scheduled_time}`}
+          </div>
+          <ElapsedBadge ticket={ticket} />
+        </div>
         {ticket.report && (
-          <div className="px-4 py-3">
+          <div className="px-4 pb-3">
             <p className="text-xs font-semibold text-slate-500 mb-1.5">Relatorio</p>
             <pre className="text-xs text-slate-500 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-xl p-3">
               {ticket.report}
@@ -109,7 +165,42 @@ function TicketItem({ ticket, form, sigRef, onChange }: TicketItemProps) {
     )
   }
 
-  // ── Editable view (aberto or pendente) ────────────────────────────────────
+  // ── Read-only: queued (pending but not the most recent) ───────────────────
+  if (isQueueLocked) {
+    return (
+      <div className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden opacity-70">
+        <div className="px-4 pt-4 pb-3 border-b border-slate-50 flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-1">Descricao</p>
+            <p className="text-slate-700 text-sm leading-relaxed">{ticket.description}</p>
+            {ticket.categoria && (
+              <span className="inline-block mt-1.5 text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
+                {ticket.categoria}
+              </span>
+            )}
+          </div>
+          <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
+            <Lock className="w-3 h-3" />
+            Na fila
+          </span>
+        </div>
+        <div className="px-4 py-3 flex flex-wrap gap-2 items-center">
+          <div className="inline-flex items-center gap-1.5 text-xs text-slate-400">
+            <Clock className="w-3 h-3" />{formatDate(ticket.scheduled_date)}
+            {ticket.scheduled_time && ` às ${ticket.scheduled_time}`}
+          </div>
+          <ElapsedBadge ticket={ticket} />
+        </div>
+        <div className="mx-4 mb-4 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
+          <p className="text-[11px] text-amber-700 font-medium">
+            Conclua o chamado mais recente deste local para desbloquear este.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Editable view (aberto or pendente — most recent) ──────────────────────
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
 
@@ -124,7 +215,16 @@ function TicketItem({ ticket, form, sigRef, onChange }: TicketItemProps) {
         )}
       </div>
 
-      {/* Historico anterior — para tickets pendentes, sempre visivel */}
+      {/* Timer row */}
+      <div className="px-4 pt-3 flex flex-wrap gap-2 items-center">
+        <div className="inline-flex items-center gap-1.5 text-xs text-slate-400">
+          <Clock className="w-3 h-3" />{formatDate(ticket.scheduled_date)}
+          {ticket.scheduled_time && ` às ${ticket.scheduled_time}`}
+        </div>
+        <ElapsedBadge ticket={ticket} />
+      </div>
+
+      {/* Historico anterior — para tickets pendentes */}
       {isPendente && ticket.report && (
         <div className="px-4 pt-3">
           <p className="text-xs font-semibold text-slate-500 mb-1.5">Historico anterior</p>
@@ -140,7 +240,7 @@ function TicketItem({ ticket, form, sigRef, onChange }: TicketItemProps) {
         <StatusSelector value={form.status} onChange={v => onChange({ status: v, changed: true })} />
       </div>
 
-      {/* Observacao — nova entrada sempre vazia */}
+      {/* Observacao */}
       <div className="px-4 pb-3">
         <label className="text-xs font-semibold text-slate-600 block mb-1.5">
           Observacao
@@ -154,10 +254,9 @@ function TicketItem({ ticket, form, sigRef, onChange }: TicketItemProps) {
           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 resize-none transition" />
       </div>
 
-      {/* Foto + Assinatura — apenas quando Concluido (selecionado) */}
+      {/* Foto + Assinatura — apenas quando Concluido */}
       {form.status === 'concluido' && (
         <>
-          {/* Foto */}
           <div className="px-4 pb-3">
             <p className="text-xs font-semibold text-slate-600 mb-2">
               Foto <span className="font-normal text-slate-400">(opcional)</span>
@@ -181,7 +280,6 @@ function TicketItem({ ticket, form, sigRef, onChange }: TicketItemProps) {
             )}
           </div>
 
-          {/* Assinatura */}
           <div className="px-4 pb-4">
             <p className="text-xs font-semibold text-slate-600 mb-2">
               Assinatura do cliente <span className="font-normal text-slate-400">(opcional)</span>
@@ -205,8 +303,6 @@ export default function BaixaTicket() {
   const [forms, setForms] = useState<Map<string, TicketForm>>(() => {
     const m = new Map<string, TicketForm>()
     for (const t of state?.tickets ?? []) {
-      // Already-concluded tickets get their original status (read-only view will render instead)
-      // Aberto tickets default to 'concluido' so the tech must consciously switch to 'pendente'
       const initial: TicketStatus = t.status === 'aberto' ? 'concluido' : t.status
       m.set(t.id, { status: initial, observacao: '', changed: false, photoFile: null, photoPreview: null })
     }
@@ -233,8 +329,9 @@ export default function BaixaTicket() {
     first.bloco   ? `Bl. ${first.bloco}`     : null,
   ].filter(Boolean).join(' / ')
 
-  // Only show Finalizar when there are editable (non-concluded) tickets
-  const hasEditable = tickets.some(t => t.status !== 'concluido')
+  // ── Queue logic: only the most recent editable ticket is unlocked ─────────
+  const editableId = mostRecentEditableId(tickets)
+  const hasEditable = editableId !== null
 
   function updateForm(id: string, patch: Partial<TicketForm>) {
     setForms(prev => { const m = new Map(prev); m.set(id, { ...prev.get(id)!, ...patch }); return m })
@@ -249,7 +346,7 @@ export default function BaixaTicket() {
       const form      = forms.get(ticket.id)!
       const sigHandle = sigRefs.current.get(ticket.id) ?? null
 
-      // ── Report ──────────────────────────────────────────────────────────────
+      // ── Report ────────────────────────────────────────────────────────────
       let report: string | null = ticket.report
       if (form.observacao.trim()) {
         report = form.status === 'pendente'
@@ -257,7 +354,7 @@ export default function BaixaTicket() {
           : form.observacao.trim()
       }
 
-      // ── Photo upload (only on concluido) ────────────────────────────────────
+      // ── Photo upload ──────────────────────────────────────────────────────
       let photoUrl: string | null = ticket.photo_url
       if (form.status === 'concluido' && form.photoFile) {
         const ext  = (form.photoFile.name.split('.').pop() ?? 'jpg').split('?')[0]
@@ -269,7 +366,7 @@ export default function BaixaTicket() {
         if (upd)  { photoUrl = supabase.storage.from('photos').getPublicUrl(upd.path).data.publicUrl }
       }
 
-      // ── Signature upload (only on concluido) ────────────────────────────────
+      // ── Signature upload ──────────────────────────────────────────────────
       let signatureUrl: string | null = ticket.signature_url
       if (form.status === 'concluido' && sigHandle && !sigHandle.isEmpty()) {
         const dataUrl = sigHandle.getDataURL()
@@ -281,20 +378,21 @@ export default function BaixaTicket() {
         if (sigd)  { signatureUrl = supabase.storage.from('photos').getPublicUrl(sigd.path).data.publicUrl }
       }
 
-      // ── Save ────────────────────────────────────────────────────────────────
+      // ── Save ──────────────────────────────────────────────────────────────
+      const isConcluding = form.status === 'concluido'
       const { error } = await supabase
         .from('tickets')
         .update({
-          status: form.status,
+          status:        form.status,
           report,
-          photo_url:     form.status === 'concluido' ? photoUrl     : ticket.photo_url,
-          signature_url: form.status === 'concluido' ? signatureUrl : ticket.signature_url,
+          completed_at:  isConcluding ? new Date().toISOString() : null,
+          photo_url:     isConcluding ? photoUrl     : ticket.photo_url,
+          signature_url: isConcluding ? signatureUrl : ticket.signature_url,
         } satisfies Database['public']['Tables']['tickets']['Update'])
         .eq('id', ticket.id)
       if (error) { setSubmitError(error.message); setSubmitting(false); return }
     }
 
-    // ── Redirect back to dashboard on success ───────────────────────────────
     navigate('/tecnico', { replace: true })
   }
 
@@ -334,15 +432,20 @@ export default function BaixaTicket() {
           <div className="flex-1 h-px bg-slate-200" />
         </div>
 
-        {tickets.map(ticket => (
-          <TicketItem
-            key={ticket.id}
-            ticket={ticket}
-            form={forms.get(ticket.id)!}
-            sigRef={el => { sigRefs.current.set(ticket.id, el) }}
-            onChange={patch => updateForm(ticket.id, patch)}
-          />
-        ))}
+        {tickets.map(ticket => {
+          // A non-concluded ticket is queue-locked if it is NOT the most recent editable
+          const isQueueLocked = ticket.status !== 'concluido' && ticket.id !== editableId
+          return (
+            <TicketItem
+              key={ticket.id}
+              ticket={ticket}
+              form={forms.get(ticket.id)!}
+              sigRef={el => { sigRefs.current.set(ticket.id, el) }}
+              onChange={patch => updateForm(ticket.id, patch)}
+              isQueueLocked={isQueueLocked}
+            />
+          )
+        })}
 
         {submitError && (
           <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-600 rounded-xl px-4 py-3 text-sm">

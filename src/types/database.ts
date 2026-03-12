@@ -38,6 +38,7 @@ export interface Database {
           photo_url: string | null
           signature_url: string | null
           completed_at: string | null
+          duration: string | null
         }
         Insert: {
           id?: string
@@ -54,6 +55,7 @@ export interface Database {
           photo_url?: string | null
           signature_url?: string | null
           completed_at?: string | null
+          duration?: string | null
         }
         Update: {
           id?: string
@@ -70,6 +72,7 @@ export interface Database {
           photo_url?: string | null
           signature_url?: string | null
           completed_at?: string | null
+          duration?: string | null
         }
         Relationships: []
       }

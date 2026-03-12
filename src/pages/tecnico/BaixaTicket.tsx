@@ -48,6 +48,16 @@ function formatElapsed(startAt: Date, endAt: Date): string {
   return h === 0 ? `${m}min` : m === 0 ? `${h}h` : `${h}h ${m}min`
 }
 
+/** Format elapsed time as a compact "2h 15m" / "45m" string for storage. */
+function formatDuration(startAt: Date, endAt: Date): string {
+  const totalMins = Math.max(0, Math.floor((endAt.getTime() - startAt.getTime()) / 60_000))
+  const h = Math.floor(totalMins / 60)
+  const m = totalMins % 60
+  if (h === 0) return `${m}m`
+  if (m === 0) return `${h}h`
+  return `${h}h ${m}m`
+}
+
 /** Derive the most-recent editable ticket id among non-concluded tickets. */
 function mostRecentEditableId(tickets: TicketWithRelations[]): string | null {
   const editable = tickets.filter(t => t.status !== 'concluido')
@@ -380,12 +390,15 @@ export default function BaixaTicket() {
 
       // ── Save ──────────────────────────────────────────────────────────────
       const isConcluding = form.status === 'concluido'
+      const concludedAt  = new Date()
+      const startAt      = parseScheduledAt(ticket.scheduled_date, ticket.scheduled_time)
       const { error } = await supabase
         .from('tickets')
         .update({
           status:        form.status,
           report,
-          completed_at:  isConcluding ? new Date().toISOString() : null,
+          completed_at:  isConcluding ? concludedAt.toISOString()             : null,
+          duration:      isConcluding ? formatDuration(startAt, concludedAt)  : null,
           photo_url:     isConcluding ? photoUrl     : ticket.photo_url,
           signature_url: isConcluding ? signatureUrl : ticket.signature_url,
         } satisfies Database['public']['Tables']['tickets']['Update'])

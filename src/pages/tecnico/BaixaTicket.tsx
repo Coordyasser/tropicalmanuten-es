@@ -32,9 +32,16 @@ function buildReport(newObs: string, old: string | null): string {
   return old ? `${entry}\n\n${old}` : entry
 }
 
-/** Combine scheduled_date + scheduled_time into a Date, or midnight if no time. */
+/** Combine scheduled_date + scheduled_time into a Date, or midnight if no time.
+ *  Supabase `time` columns may return "HH:MM:SS", so we take only the first 5
+ *  characters ("HH:MM") before constructing the ISO string, preventing the
+ *  Invalid Date that results from "YYYY-MM-DDTHH:MM:SS:00".
+ */
 function parseScheduledAt(date: string, time: string | null): Date {
-  return time ? new Date(`${date}T${time}:00`) : new Date(`${date}T00:00:00`)
+  if (!date) return new Date(NaN)
+  const hhmm = time ? time.slice(0, 5) : '00:00'
+  const dt   = new Date(`${date}T${hhmm}:00`)
+  return isNaN(dt.getTime()) ? new Date(`${date}T00:00:00`) : dt
 }
 
 /** Format elapsed milliseconds as "Xh Ym" or "Ym" or "< 1min". */
@@ -48,8 +55,11 @@ function formatElapsed(startAt: Date, endAt: Date): string {
   return h === 0 ? `${m}min` : m === 0 ? `${h}h` : `${h}h ${m}min`
 }
 
-/** Format elapsed time as a compact "2h 15m" / "45m" string for storage. */
+/** Format elapsed time as a compact "2h 15m" / "45m" string for storage.
+ *  Returns "—" if either Date is invalid (NaN guard).
+ */
 function formatDuration(startAt: Date, endAt: Date): string {
+  if (isNaN(startAt.getTime()) || isNaN(endAt.getTime())) return '—'
   const totalMins = Math.max(0, Math.floor((endAt.getTime() - startAt.getTime()) / 60_000))
   const h = Math.floor(totalMins / 60)
   const m = totalMins % 60

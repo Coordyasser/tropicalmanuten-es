@@ -102,7 +102,7 @@ export default function CalendarioTecnico({ tickets, loading, onVerTicket }: Cal
                   <span className={[
                     'w-6 h-6 flex items-center justify-center rounded-full text-xs font-medium',
                     isToday
-                      ? 'bg-blue-600 text-white font-bold'
+                      ? 'bg-brand-red text-white font-bold'
                       : isCurrentMonth
                         ? 'text-slate-700'
                         : 'text-slate-300',

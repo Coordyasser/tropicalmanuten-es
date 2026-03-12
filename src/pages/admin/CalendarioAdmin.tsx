@@ -102,7 +102,7 @@ export default function CalendarioAdmin({ tickets, loading, onVerTicket }: Calen
                   <span className={[
                     'w-7 h-7 flex items-center justify-center rounded-full text-sm font-medium',
                     isToday
-                      ? 'bg-blue-600 text-white font-bold'
+                      ? 'bg-brand-red text-white font-bold'
                       : isCurrentMonth
                         ? 'text-slate-700'
                         : 'text-slate-300',

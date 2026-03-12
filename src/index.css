@@ -1,1 +1,8 @@
 @import "tailwindcss";
+
+@theme {
+  /* ── Tropical Construtora brand palette ──────────────────────── */
+  --color-brand-red:      #C41820;   /* vermelho principal         */
+  --color-brand-red-dark: #9E1319;   /* hover / gradiente escuro   */
+  --color-brand-yellow:   #F5BF00;   /* amarelo / destaque         */
+}

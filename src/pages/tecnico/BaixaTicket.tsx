@@ -271,7 +271,7 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
         <textarea rows={3} value={form.observacao}
           onChange={e => onChange({ observacao: e.target.value, changed: true })}
           placeholder={form.status === 'pendente' ? 'Ex: Aguardando material...' : 'O que foi realizado...'}
-          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 resize-none transition" />
+          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-brand-red focus:ring-2 focus:ring-brand-red/20 resize-none transition" />
       </div>
 
       {/* Foto + Assinatura — apenas quando Concluido */}
@@ -293,7 +293,7 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
               </div>
             ) : (
               <button type="button" onClick={() => photoInputRef.current?.click()}
-                className="w-full h-24 border-2 border-dashed border-slate-300 rounded-xl bg-white flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-colors active:scale-[0.98]">
+                className="w-full h-24 border-2 border-dashed border-slate-300 rounded-xl bg-white flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-brand-red hover:text-brand-red transition-colors active:scale-[0.98]">
                 <Camera className="w-6 h-6" />
                 <span className="text-xs font-medium">Tirar foto</span>
               </button>
@@ -336,7 +336,7 @@ export default function BaixaTicket() {
       <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center gap-4 p-6 text-center">
         <AlertCircle className="w-12 h-12 text-red-400" />
         <p className="text-slate-600 text-sm">Nenhum chamado encontrado.</p>
-        <button onClick={() => navigate('/tecnico')} className="text-blue-600 text-sm font-medium underline">Voltar</button>
+        <button onClick={() => navigate('/tecnico')} className="text-brand-red text-sm font-medium underline">Voltar</button>
       </div>
     )
   }
@@ -421,23 +421,23 @@ export default function BaixaTicket() {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
-      <header className="sticky top-0 z-10 bg-blue-700 text-white px-4 pt-10 pb-4 shadow-md">
+      <header className="sticky top-0 z-10 bg-brand-red text-white px-4 pt-10 pb-4 shadow-md">
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/tecnico')}
             className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="min-w-0">
-            <p className="text-blue-200 text-xs">Baixa de Chamados</p>
+            <p className="text-white/60 text-xs">Baixa de Chamados</p>
             <h1 className="font-bold text-base truncate">{locationName}</h1>
-            {locationDetail && <p className="text-blue-200 text-xs truncate">{locationDetail}</p>}
+            {locationDetail && <p className="text-white/60 text-xs truncate">{locationDetail}</p>}
           </div>
         </div>
       </header>
 
       <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-32">
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 flex items-center gap-3">
-          <MapPin className="w-4 h-4 text-blue-400 shrink-0" />
+          <MapPin className="w-4 h-4 text-brand-red shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-slate-700 font-semibold text-sm truncate">{locationName}</p>
             {locationDetail && <p className="text-slate-400 text-xs">{locationDetail}</p>}

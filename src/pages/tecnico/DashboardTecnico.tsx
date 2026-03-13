@@ -119,7 +119,7 @@ function GroupCard({
         <div className="flex items-center gap-2 flex-wrap">
           {isPending ? (
             <>
-              {hasAberto > 0 && (
+              {hasAberto && (
                 <span className="text-[11px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
                   {group.counts.aberto} Aberto{group.counts.aberto > 1 ? 's' : ''}
                 </span>

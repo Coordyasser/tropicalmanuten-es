@@ -128,10 +128,10 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onRe
     <div className="flex flex-col h-full gap-3">
 
       {/* ── Search + Date range ── */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
 
         {/* Search */}
-        <div className="relative flex-1 min-w-[220px]">
+        <div className="relative flex-1 min-w-0 sm:min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <input
             type="text"
@@ -148,26 +148,26 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onRe
           )}
         </div>
 
-        {/* Date from */}
-        <div className="flex items-center gap-1.5">
-          <label className="text-xs text-slate-400 font-medium whitespace-nowrap">De</label>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
-            className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition"
-          />
-        </div>
-
-        {/* Date to */}
-        <div className="flex items-center gap-1.5">
-          <label className="text-xs text-slate-400 font-medium whitespace-nowrap">Ate</label>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
-            className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition"
-          />
+        {/* Date from + to (side by side even on mobile) */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs text-slate-400 font-medium whitespace-nowrap">De</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="px-2 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs text-slate-400 font-medium whitespace-nowrap">Ate</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="px-2 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 transition"
+            />
+          </div>
         </div>
 
         {/* Clear extra filters */}
@@ -211,7 +211,7 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onRe
       </div>
 
       {/* ── Table ── */}
-      <div className="flex-1 overflow-auto rounded-xl border border-slate-200 bg-white">
+      <div className="flex-1 overflow-x-auto rounded-xl border border-slate-200 bg-white">
 
         {loading && (
           <div className="flex items-center justify-center h-64 gap-2 text-slate-400">

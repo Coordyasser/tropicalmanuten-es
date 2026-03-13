@@ -360,60 +360,99 @@ export default function BaixaTicket() {
   async function handleFinalizar() {
     setSubmitting(true)
     setSubmitError(null)
-    const changed = tickets.filter(t => t.status !== 'concluido' && forms.get(t.id)?.changed)
 
-    for (const ticket of changed) {
-      const form      = forms.get(ticket.id)!
-      const sigHandle = sigRefs.current.get(ticket.id) ?? null
+    if (!editableId) { navigate('/tecnico', { replace: true }); return }
 
-      // ── Report ────────────────────────────────────────────────────────────
-      let report: string | null = ticket.report
-      if (form.observacao.trim()) {
-        report = form.status === 'pendente'
-          ? buildReport(form.observacao, ticket.report)
-          : form.observacao.trim()
+    const editableTicket = tickets.find(t => t.id === editableId)!
+    const form           = forms.get(editableId)!
+
+    // Nothing changed — just go back
+    if (!form.changed) { navigate('/tecnico', { replace: true }); return }
+
+    const isConcluding = form.status === 'concluido'
+    const concludedAt  = new Date()
+    const startAt      = parseScheduledAt(editableTicket.scheduled_date, editableTicket.scheduled_time)
+
+    // Older non-concluded tickets in this group (sorted oldest → newest)
+    const olderPending = tickets
+      .filter(t => t.status !== 'concluido' && t.id !== editableId)
+      .sort((a, b) => {
+        const aKey = a.scheduled_date + (a.scheduled_time ?? '')
+        const bKey = b.scheduled_date + (b.scheduled_time ?? '')
+        return aKey.localeCompare(bKey) // ascending = oldest first
+      })
+
+    // The editable ticket is also the oldest when there are no older pending tickets
+    const isOldestInGroup = olderPending.length === 0
+
+    // ── Photo upload ──────────────────────────────────────────────────────
+    let photoUrl: string | null = editableTicket.photo_url
+    if (isConcluding && form.photoFile) {
+      const ext  = (form.photoFile.name.split('.').pop() ?? 'jpg').split('?')[0]
+      const path = `tickets/${editableTicket.id}/photo.${ext}`
+      const { data: upd, error: upe } = await supabase.storage
+        .from('photos')
+        .upload(path, form.photoFile, { upsert: true, contentType: form.photoFile.type || 'image/jpeg' })
+      if (upe) { setSubmitError(`Erro ao enviar foto: ${upe.message}`); setSubmitting(false); return }
+      if (upd) { photoUrl = supabase.storage.from('photos').getPublicUrl(upd.path).data.publicUrl }
+    }
+
+    // ── Signature upload ──────────────────────────────────────────────────
+    let signatureUrl: string | null = editableTicket.signature_url
+    const sigHandle = sigRefs.current.get(editableTicket.id) ?? null
+    if (isConcluding && sigHandle && !sigHandle.isEmpty()) {
+      const dataUrl = sigHandle.getDataURL()
+      const blob    = await (await fetch(dataUrl)).blob()
+      const { data: sigd, error: sige } = await supabase.storage
+        .from('photos')
+        .upload(`tickets/${editableTicket.id}/signature.png`, blob, { upsert: true, contentType: 'image/png' })
+      if (sige) { setSubmitError(`Erro ao enviar assinatura: ${sige.message}`); setSubmitting(false); return }
+      if (sigd) { signatureUrl = supabase.storage.from('photos').getPublicUrl(sigd.path).data.publicUrl }
+    }
+
+    // ── Report ────────────────────────────────────────────────────────────
+    let report: string | null = editableTicket.report
+    if (form.observacao.trim()) {
+      report = isConcluding
+        ? form.observacao.trim()
+        : buildReport(form.observacao, editableTicket.report)
+    }
+
+    // ── Save editable (most recent) ticket ───────────────────────────────
+    // Duration: only if it's also the oldest in the group (single-ticket case)
+    const { error: editErr } = await supabase
+      .from('tickets')
+      .update({
+        status:        form.status,
+        report,
+        completed_at:  isConcluding ? concludedAt.toISOString() : null,
+        duration:      isConcluding && isOldestInGroup
+                         ? formatDuration(startAt, concludedAt)
+                         : null,
+        photo_url:     isConcluding ? photoUrl     : editableTicket.photo_url,
+        signature_url: isConcluding ? signatureUrl : editableTicket.signature_url,
+      } satisfies Database['public']['Tables']['tickets']['Update'])
+      .eq('id', editableTicket.id)
+
+    if (editErr) { setSubmitError(editErr.message); setSubmitting(false); return }
+
+    // ── Cascade: close older pending tickets ─────────────────────────────
+    // Duration rule: oldest gets the duration, intermediaries get null
+    if (isConcluding && olderPending.length > 0) {
+      for (let i = 0; i < olderPending.length; i++) {
+        const t        = olderPending[i]
+        const isOldest = i === 0
+        const tStart   = parseScheduledAt(t.scheduled_date, t.scheduled_time)
+        const { error } = await supabase
+          .from('tickets')
+          .update({
+            status:       'concluido',
+            completed_at: concludedAt.toISOString(),
+            duration:     isOldest ? formatDuration(tStart, concludedAt) : null,
+          })
+          .eq('id', t.id)
+        if (error) { setSubmitError(error.message); setSubmitting(false); return }
       }
-
-      // ── Photo upload ──────────────────────────────────────────────────────
-      let photoUrl: string | null = ticket.photo_url
-      if (form.status === 'concluido' && form.photoFile) {
-        const ext  = (form.photoFile.name.split('.').pop() ?? 'jpg').split('?')[0]
-        const path = `tickets/${ticket.id}/photo.${ext}`
-        const { data: upd, error: upe } = await supabase.storage
-          .from('photos')
-          .upload(path, form.photoFile, { upsert: true, contentType: form.photoFile.type || 'image/jpeg' })
-        if (upe) { setSubmitError(`Erro ao enviar foto: ${upe.message}`); setSubmitting(false); return }
-        if (upd)  { photoUrl = supabase.storage.from('photos').getPublicUrl(upd.path).data.publicUrl }
-      }
-
-      // ── Signature upload ──────────────────────────────────────────────────
-      let signatureUrl: string | null = ticket.signature_url
-      if (form.status === 'concluido' && sigHandle && !sigHandle.isEmpty()) {
-        const dataUrl = sigHandle.getDataURL()
-        const blob    = await (await fetch(dataUrl)).blob()
-        const { data: sigd, error: sige } = await supabase.storage
-          .from('photos')
-          .upload(`tickets/${ticket.id}/signature.png`, blob, { upsert: true, contentType: 'image/png' })
-        if (sige) { setSubmitError(`Erro ao enviar assinatura: ${sige.message}`); setSubmitting(false); return }
-        if (sigd)  { signatureUrl = supabase.storage.from('photos').getPublicUrl(sigd.path).data.publicUrl }
-      }
-
-      // ── Save ──────────────────────────────────────────────────────────────
-      const isConcluding = form.status === 'concluido'
-      const concludedAt  = new Date()
-      const startAt      = parseScheduledAt(ticket.scheduled_date, ticket.scheduled_time)
-      const { error } = await supabase
-        .from('tickets')
-        .update({
-          status:        form.status,
-          report,
-          completed_at:  isConcluding ? concludedAt.toISOString()             : null,
-          duration:      isConcluding ? formatDuration(startAt, concludedAt)  : null,
-          photo_url:     isConcluding ? photoUrl     : ticket.photo_url,
-          signature_url: isConcluding ? signatureUrl : ticket.signature_url,
-        } satisfies Database['public']['Tables']['tickets']['Update'])
-        .eq('id', ticket.id)
-      if (error) { setSubmitError(error.message); setSubmitting(false); return }
     }
 
     navigate('/tecnico', { replace: true })

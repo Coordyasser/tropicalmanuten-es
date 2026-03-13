@@ -5,6 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useProjects } from '../../hooks/useProjects'
 import { useTecnicos } from '../../hooks/useTecnicos'
 import type { Database } from '../../types/database'
+import { categorizeTicket } from '../../lib/categorizeTicket'
 
 interface NovoTicketModalProps {
   open: boolean
@@ -14,7 +15,7 @@ interface NovoTicketModalProps {
 
 const EMPTY = {
   projectId: '', techId: '', scheduledDate: '', scheduledTime: '',
-  unidade: '', bloco: '', categoria: '', description: '',
+  unidade: '', bloco: '', description: '',
 }
 
 export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicketModalProps) {
@@ -48,13 +49,21 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
       scheduled_time: form.scheduledTime || null,
       unidade: unidade.trim(),
       bloco: form.bloco.trim() || null,
-      categoria: form.categoria.trim() || null,
       description: description.trim(),
       status: 'aberto',
     }
-    const { error: insertErr } = await supabase.from('tickets').insert(payload)
-    if (insertErr) { setError(insertErr.message); setSubmitting(false) }
-    else { setSubmitting(false); onSuccess(); onClose() }
+    const { data: inserted, error: insertErr } = await supabase
+      .from('tickets').insert(payload).select('id').single()
+    if (insertErr) { setError(insertErr.message); setSubmitting(false); return }
+
+    // Auto-categorize in background — do not block the UI
+    if (inserted?.id) {
+      categorizeTicket(description.trim()).then(categoria =>
+        supabase.from('tickets').update({ categoria }).eq('id', inserted.id)
+      )
+    }
+
+    setSubmitting(false); onSuccess(); onClose()
   }
 
   if (!open) return null
@@ -98,11 +107,6 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
               <input type="text" value={form.bloco} onChange={set('bloco')} disabled={submitting}
                 placeholder="Ex: A, Torre 1" className={inputCls} />
             </div>
-          </div>
-          <div>
-            <label className={labelCls}>Categoria</label>
-            <input type="text" value={form.categoria} onChange={set('categoria')} disabled={submitting}
-              placeholder="Ex: Hidraulica, Eletrica, Pintura" className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>Tecnico responsavel *</label>

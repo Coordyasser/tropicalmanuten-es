@@ -6,6 +6,7 @@ import { useProjects } from '../../hooks/useProjects'
 import { useTecnicos } from '../../hooks/useTecnicos'
 import type { AdminTicket } from '../../hooks/useAdminTickets'
 import type { Database } from '../../types/database'
+import { CATEGORIAS } from '../../lib/categorizeTicket'
 
 interface EditTicketModalProps {
   ticket: AdminTicket | null
@@ -136,8 +137,11 @@ export default function EditTicketModal({ ticket, onClose, onSuccess }: EditTick
           {/* Categoria */}
           <div>
             <label className={labelCls}>Categoria</label>
-            <input type="text" value={form.categoria} onChange={set('categoria')}
-              disabled={submitting} placeholder="Ex: Hidraulica, Eletrica" className={inputCls} />
+            <select value={form.categoria} onChange={set('categoria')}
+              disabled={submitting} className={inputCls}>
+              <option value="">Classificando automaticamente...</option>
+              {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
 
           {/* Tecnico */}

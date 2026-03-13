@@ -41,7 +41,10 @@ export default function CalendarioAdmin({ tickets, loading, onVerTicket }: Calen
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Allow horizontal scroll on small screens */}
+      <div className="overflow-x-auto">
 
+      <div className="min-w-[560px]">
       {/* ── Calendar header ── */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
         <h2 className="font-bold text-slate-800 text-lg">{capitalised}</h2>
@@ -140,6 +143,9 @@ export default function CalendarioAdmin({ tickets, loading, onVerTicket }: Calen
           })}
         </div>
       )}
+
+      </div>{/* end min-w */}
+      </div>{/* end overflow-x-auto */}
 
       {/* ── Legend ── */}
       <div className="flex items-center gap-4 px-6 py-3 border-t border-slate-100 bg-slate-50/50">

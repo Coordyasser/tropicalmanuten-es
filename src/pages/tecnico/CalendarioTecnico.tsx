@@ -4,7 +4,7 @@ import {
   eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths,
 } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, MapPin, Tag, User, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, MapPin, Tag, X } from 'lucide-react'
 import type { TicketWithRelations } from '../../hooks/useTickets'
 
 interface CalendarioTecnicoProps {

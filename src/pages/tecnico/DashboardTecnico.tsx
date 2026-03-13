@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Building2, CalendarDays, ChevronRight, ClipboardList,
-  Clock, Lock, LogOut, WifiOff,
+  Clock, LogOut, WifiOff,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTickets } from '../../hooks/useTickets'
@@ -17,15 +17,22 @@ interface TicketGroup {
   projectName: string
   bloco: string | null
   unidade: string | null
-  tickets: TicketWithRelations[]
+  tickets: TicketWithRelations[]       // sorted newest first
   counts: Record<TicketStatus, number>
-  earliestDate: string
   latestDate: string
+  latestTime: string | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function sortDesc(a: TicketWithRelations, b: TicketWithRelations): number {
+  const da = a.scheduled_date + (a.scheduled_time ?? '')
+  const db = b.scheduled_date + (b.scheduled_time ?? '')
+  return db.localeCompare(da)
+}
+
 function groupTickets(tickets: TicketWithRelations[]): TicketGroup[] {
   const map = new Map<string, TicketGroup>()
+  // tickets already sorted newest first when called
   for (const t of tickets) {
     const key = `${t.project_id}|${t.bloco ?? ''}|${t.unidade ?? ''}`
     if (!map.has(key)) {
@@ -37,114 +44,44 @@ function groupTickets(tickets: TicketWithRelations[]): TicketGroup[] {
         unidade:     t.unidade,
         tickets:     [],
         counts:      { aberto: 0, pendente: 0, concluido: 0 },
-        earliestDate: t.scheduled_date,
-        latestDate:   t.scheduled_date,
+        latestDate:  t.scheduled_date,
+        latestTime:  t.scheduled_time ?? null,
       })
     }
     const g = map.get(key)!
     g.tickets.push(t)
     g.counts[t.status]++
-    if (t.scheduled_date < g.earliestDate) g.earliestDate = t.scheduled_date
-    if (t.scheduled_date > g.latestDate)   g.latestDate   = t.scheduled_date
+    if (t.scheduled_date > g.latestDate ||
+        (t.scheduled_date === g.latestDate && (t.scheduled_time ?? '') > (g.latestTime ?? ''))) {
+      g.latestDate = t.scheduled_date
+      g.latestTime = t.scheduled_time ?? null
+    }
   }
   return Array.from(map.values())
 }
 
 function formatDate(d: string): string {
-  const [y, m, day] = d.split('-')
-  return `${day}/${m}/${y}`
+  const [, m, day] = d.split('-')
+  return `${day}/${m}`
 }
 
-function sortDesc(a: TicketWithRelations, b: TicketWithRelations): number {
-  const da = a.scheduled_date + (a.scheduled_time ?? '')
-  const db = b.scheduled_date + (b.scheduled_time ?? '')
-  return db.localeCompare(da)
-}
+// ── GroupCard ─────────────────────────────────────────────────────────────────
+function GroupCard({
+  group,
+  onClick,
+  variant,
+}: { group: TicketGroup; onClick: () => void; variant: 'ativas' | 'concluidas' }) {
+  const isPending  = variant === 'ativas'
+  const mostRecent = group.tickets[0] // sorted newest first
 
-// ── TicketFlatCard (ativas tab — individual tickets) ──────────────────────────
-function TicketFlatCard({
-  ticket, isLocked, onPress,
-}: { ticket: TicketWithRelations; isLocked: boolean; onPress: () => void }) {
-  const isPendente = ticket.status === 'pendente'
+  const hasPendente = group.counts.pendente > 0
+  const hasAberto   = group.counts.aberto   > 0
+  const total       = group.tickets.length
 
-  return (
-    <div
-      role={isLocked ? undefined : 'button'}
-      tabIndex={isLocked ? undefined : 0}
-      onClick={isLocked ? undefined : onPress}
-      onKeyDown={isLocked ? undefined : (e => { if (e.key === 'Enter' || e.key === ' ') onPress() })}
-      className={[
-        'bg-white rounded-2xl shadow-sm border overflow-hidden flex items-stretch transition-all',
-        isLocked
-          ? 'border-amber-100 opacity-60 cursor-default'
-          : 'border-slate-100 cursor-pointer hover:shadow-md hover:border-slate-200 active:scale-[0.98]',
-      ].join(' ')}
-    >
-      {/* Left color strip */}
-      <div className={`w-1 shrink-0 ${isLocked ? 'bg-amber-200' : isPendente ? 'bg-orange-400' : 'bg-slate-400'}`} />
+  const stripColor = isPending
+    ? (hasPendente ? 'bg-orange-400' : 'bg-slate-400')
+    : 'bg-emerald-400'
 
-      <div className="flex-1 p-4 min-w-0">
-        {/* Row 1: location + status badge */}
-        <div className="flex items-start justify-between gap-2 mb-1.5">
-          <div className="flex items-center gap-2 min-w-0">
-            <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span className="text-slate-800 font-semibold text-sm truncate">
-              {ticket.project?.name ?? '—'}
-              {ticket.unidade && <span className="text-slate-400 font-normal"> — Unid. {ticket.unidade}</span>}
-              {ticket.bloco   && <span className="text-slate-400 font-normal"> / Bl. {ticket.bloco}</span>}
-            </span>
-          </div>
-          {isLocked ? (
-            <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-              <Lock className="w-3 h-3" /> Na fila
-            </span>
-          ) : (
-            <span className={['shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full',
-              isPendente ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600',
-            ].join(' ')}>
-              {isPendente ? 'Pendente' : 'Aberto'}
-            </span>
-          )}
-        </div>
-
-        {/* Row 2: description */}
-        <p className="text-slate-500 text-xs leading-relaxed line-clamp-2 mb-2">
-          {ticket.description}
-        </p>
-
-        {/* Row 3: date + category */}
-        <div className="flex items-center gap-3 flex-wrap">
-          <span className="text-[11px] text-slate-400 flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            {formatDate(ticket.scheduled_date)}
-            {ticket.scheduled_time && ` às ${ticket.scheduled_time.slice(0, 5)}`}
-          </span>
-          {ticket.categoria && (
-            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full truncate max-w-[140px]">
-              {ticket.categoria}
-            </span>
-          )}
-        </div>
-
-        {/* Lock message */}
-        {isLocked && (
-          <p className="mt-2 text-[10px] text-amber-600 font-medium">
-            Conclua o chamado mais recente deste local para desbloquear
-          </p>
-        )}
-      </div>
-
-      {!isLocked && (
-        <div className="flex items-center pr-3 pl-1 text-slate-300">
-          <ChevronRight className="w-5 h-5" />
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── GroupCard (concluidas tab — grouped by location) ──────────────────────────
-function GroupCard({ group, onClick }: { group: TicketGroup; onClick: () => void }) {
   return (
     <div
       role="button" tabIndex={0}
@@ -152,25 +89,61 @@ function GroupCard({ group, onClick }: { group: TicketGroup; onClick: () => void
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
       className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex items-stretch cursor-pointer hover:shadow-md hover:border-slate-200 active:scale-[0.98] transition-all"
     >
-      <div className="w-1 shrink-0 bg-emerald-400" />
+      <div className={`w-1 shrink-0 ${stripColor}`} />
+
       <div className="flex-1 p-4 min-w-0">
-        <div className="flex items-center gap-2 mb-2">
+
+        {/* Row 1: location */}
+        <div className="flex items-center gap-2 mb-1.5">
           <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           <span className="text-slate-800 font-semibold text-sm truncate">
             {group.projectName}
             {group.unidade && <span className="text-slate-400 font-normal"> — Unid. {group.unidade}</span>}
             {group.bloco   && <span className="text-slate-400 font-normal"> / Bl. {group.bloco}</span>}
           </span>
+          {total > 1 && (
+            <span className="shrink-0 ml-auto text-[10px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">
+              {total} chamados
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-1.5 mb-2">
-          <span className="text-[11px] font-semibold bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full">
-            {group.counts.concluido} Concluido{group.counts.concluido > 1 ? 's' : ''}
+
+        {/* Row 2: description of most recent ticket */}
+        {mostRecent?.description && (
+          <p className="text-slate-500 text-xs leading-relaxed line-clamp-2 mb-2">
+            {mostRecent.description}
+          </p>
+        )}
+
+        {/* Row 3: status badges + date */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {isPending ? (
+            <>
+              {hasAberto > 0 && (
+                <span className="text-[11px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                  {group.counts.aberto} Aberto{group.counts.aberto > 1 ? 's' : ''}
+                </span>
+              )}
+              {hasPendente && (
+                <span className="text-[11px] font-semibold bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">
+                  {group.counts.pendente} Pendente{group.counts.pendente > 1 ? 's' : ''}
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-[11px] font-semibold bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full">
+              {group.counts.concluido} Concluido{group.counts.concluido > 1 ? 's' : ''}
+            </span>
+          )}
+          <span className="text-[11px] text-slate-400 flex items-center gap-1 ml-auto">
+            <Clock className="w-3 h-3" />
+            {formatDate(group.latestDate)}
+            {group.latestTime && ` às ${group.latestTime.slice(0, 5)}`}
           </span>
         </div>
-        <p className="text-slate-400 text-xs">
-          {group.tickets.length} chamado{group.tickets.length > 1 ? 's' : ''} · {formatDate(group.latestDate)}
-        </p>
+
       </div>
+
       <div className="flex items-center pr-3 pl-1 text-slate-300">
         <ChevronRight className="w-5 h-5" />
       </div>
@@ -201,42 +174,34 @@ export default function DashboardTecnico() {
   const { tickets, loading, error, refetch } = useTickets()
   const [activeTab, setActiveTab] = useState<Tab>('ativas')
 
-  // ── Ativas: flat list, newest first ───────────────────────────────────────
-  const ativasFlat = useMemo(() =>
-    tickets
-      .filter(t => t.status !== 'concluido')
-      .sort(sortDesc),
-    [tickets])
-
-  // ── Per-location most recent non-concluded ticket ────────────────────────
-  // ativasFlat is already newest-first, so first occurrence per location = most recent
-  const mostRecentByLocation = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const t of ativasFlat) {
-      const key = `${t.project_id}|${t.bloco ?? ''}|${t.unidade ?? ''}`
-      if (!map.has(key)) map.set(key, t.id)
-    }
-    return map
-  }, [ativasFlat])
-
-  // ── Concluidas: groups, newest first ────────────────────────────────────
-  const concluidasGroups = useMemo(() => {
-    const concluded = tickets.filter(t => t.status === 'concluido')
-    return groupTickets(concluded).sort((a, b) => b.latestDate.localeCompare(a.latestDate))
+  // ── Ativas groups: non-concluded, grouped by location, newest first ────────
+  const ativasGroups = useMemo(() => {
+    const pending = [...tickets].filter(t => t.status !== 'concluido').sort(sortDesc)
+    return groupTickets(pending).sort((a, b) => {
+      const da = a.latestDate + (a.latestTime ?? '')
+      const db = b.latestDate + (b.latestTime ?? '')
+      return db.localeCompare(da)
+    })
   }, [tickets])
 
-  const pendingCount = ativasFlat.length
+  // ── Concluidas groups: concluded only, newest first ───────────────────────
+  const concluidasGroups = useMemo(() => {
+    const concluded = [...tickets].filter(t => t.status === 'concluido').sort(sortDesc)
+    return groupTickets(concluded).sort((a, b) => {
+      const da = a.latestDate + (a.latestTime ?? '')
+      const db = b.latestDate + (b.latestTime ?? '')
+      return db.localeCompare(da)
+    })
+  }, [tickets])
 
-  // ── Navigation helpers ───────────────────────────────────────────────────
+  const pendingCount = tickets.filter(t => t.status !== 'concluido').length
+
+  // ── Navigation ───────────────────────────────────────────────────────────
   function getLocationTickets(ticket: TicketWithRelations): TicketWithRelations[] {
     const key = `${ticket.project_id}|${ticket.bloco ?? ''}|${ticket.unidade ?? ''}`
-    return tickets
+    return [...tickets]
       .filter(t => `${t.project_id}|${t.bloco ?? ''}|${t.unidade ?? ''}` === key)
       .sort(sortDesc)
-  }
-
-  function handleTicketClick(ticket: TicketWithRelations) {
-    navigate('/tecnico/baixa', { state: { tickets: getLocationTickets(ticket) } })
   }
 
   function handleGroupClick(group: TicketGroup) {
@@ -283,11 +248,11 @@ export default function DashboardTecnico() {
               activeTab === 'ativas' ? 'bg-brand-red text-white shadow-sm' : 'text-slate-500 hover:text-slate-700',
             ].join(' ')}>
             Pendentes
-            {ativasFlat.length > 0 && (
+            {ativasGroups.length > 0 && (
               <span className={['ml-1.5 text-[11px] font-bold px-1.5 py-0.5 rounded-full',
                 activeTab === 'ativas' ? 'bg-white/20 text-white' : 'bg-orange-100 text-orange-600',
               ].join(' ')}>
-                {ativasFlat.length}
+                {ativasGroups.length}
               </span>
             )}
           </button>
@@ -318,7 +283,6 @@ export default function DashboardTecnico() {
         ) : (
           <div className="space-y-3">
 
-            {/* Error */}
             {error && (
               <div className="flex flex-col items-center gap-3 py-12 text-center">
                 <WifiOff className="w-10 h-10 text-slate-300" />
@@ -329,25 +293,19 @@ export default function DashboardTecnico() {
               </div>
             )}
 
-            {/* Skeleton */}
             {loading && !error && <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>}
 
-            {/* ── Ativas: flat list of individual tickets, newest first ─────── */}
             {!loading && !error && activeTab === 'ativas' && (
               <>
-                {ativasFlat.map(ticket => {
-                  const locKey   = `${ticket.project_id}|${ticket.bloco ?? ''}|${ticket.unidade ?? ''}`
-                  const isLocked = mostRecentByLocation.get(locKey) !== ticket.id
-                  return (
-                    <TicketFlatCard
-                      key={ticket.id}
-                      ticket={ticket}
-                      isLocked={isLocked}
-                      onPress={() => handleTicketClick(ticket)}
-                    />
-                  )
-                })}
-                {ativasFlat.length === 0 && (
+                {ativasGroups.map(group => (
+                  <GroupCard
+                    key={group.key}
+                    group={group}
+                    variant="ativas"
+                    onClick={() => handleGroupClick(group)}
+                  />
+                ))}
+                {ativasGroups.length === 0 && (
                   <div className="flex flex-col items-center gap-3 py-16 text-center">
                     <div className="w-16 h-16 rounded-full bg-slate-200 flex items-center justify-center">
                       <ClipboardList className="w-8 h-8 text-slate-400" />
@@ -359,11 +317,15 @@ export default function DashboardTecnico() {
               </>
             )}
 
-            {/* ── Concluidas: grouped by location, newest first ────────────── */}
             {!loading && !error && activeTab === 'concluidas' && (
               <>
                 {concluidasGroups.map(group => (
-                  <GroupCard key={group.key} group={group} onClick={() => handleGroupClick(group)} />
+                  <GroupCard
+                    key={group.key}
+                    group={group}
+                    variant="concluidas"
+                    onClick={() => handleGroupClick(group)}
+                  />
                 ))}
                 {concluidasGroups.length === 0 && (
                   <div className="flex flex-col items-center gap-3 py-16 text-center">

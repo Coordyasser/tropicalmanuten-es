@@ -37,6 +37,7 @@ export interface Database {
           report: string | null
           photo_url: string | null
           signature_url: string | null
+          audio_url: string | null
           completed_at: string | null
           duration: string | null
         }
@@ -54,6 +55,7 @@ export interface Database {
           report?: string | null
           photo_url?: string | null
           signature_url?: string | null
+          audio_url?: string | null
           completed_at?: string | null
           duration?: string | null
         }
@@ -71,6 +73,7 @@ export interface Database {
           report?: string | null
           photo_url?: string | null
           signature_url?: string | null
+          audio_url?: string | null
           completed_at?: string | null
           duration?: string | null
         }

@@ -16,6 +16,7 @@ export interface AdminTicket {
   report: string | null
   photo_url: string | null
   signature_url: string | null
+  audio_url: string | null
   project: { name: string } | null
   technician: { id: string; name: string } | null
 }
@@ -40,7 +41,7 @@ export function useAdminTickets(): UseAdminTicketsResult {
       .select(`
         id, project_id, tech_id, scheduled_date, scheduled_time,
         description, unidade, bloco, categoria,
-        status, report, photo_url, signature_url,
+        status, report, photo_url, signature_url, audio_url,
         project:projects ( name ),
         technician:profiles ( id, name )
       `)

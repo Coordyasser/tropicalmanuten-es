@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, CalendarDays, ExternalLink, MapPin, User, FileText, Camera, PenLine, Tag, Clock } from 'lucide-react'
+import { X, CalendarDays, ExternalLink, MapPin, User, FileText, Camera, PenLine, Tag, Clock, Volume2 } from 'lucide-react'
 import type { AdminTicket } from '../../hooks/useAdminTickets'
 
 interface TicketDetailModalProps {
@@ -167,6 +167,20 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
               </div>
               <img src={ticket.signature_url} alt="Assinatura"
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 object-contain max-h-32" />
+            </div>
+          )}
+
+          {/* Audio */}
+          {ticket.audio_url && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Volume2 className="w-4 h-4 text-slate-400" />
+                <span className="text-sm font-semibold text-slate-600">Audio</span>
+              </div>
+              <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
+                <Volume2 className="w-4 h-4 text-blue-500 shrink-0" />
+                <audio controls src={ticket.audio_url} className="flex-1 h-8 min-w-0" />
+              </div>
             </div>
           )}
         </div>

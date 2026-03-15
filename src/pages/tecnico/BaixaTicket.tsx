@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   AlertCircle, ArrowLeft, Camera, CheckCircle2, Clock,
-  Loader2, Lock, MapPin, Timer, X,
+  Loader2, Lock, MapPin, Mic, MicOff, Timer, Volume2, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import SignatureCanvas from '../../components/SignatureCanvas'
@@ -123,6 +123,96 @@ function ElapsedBadge({ ticket }: { ticket: TicketWithRelations }) {
   )
 }
 
+// ── AudioPlayer ───────────────────────────────────────────────────────────────
+export function AudioPlayer({ url }: { url: string }) {
+  return (
+    <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
+      <Volume2 className="w-4 h-4 text-blue-500 shrink-0" />
+      <audio controls src={url} className="flex-1 h-8 min-w-0" style={{ accentColor: '#C41820' }} />
+    </div>
+  )
+}
+
+// ── AudioRecorder ─────────────────────────────────────────────────────────────
+interface AudioRecorderProps {
+  ticketId: string
+  onSaved: (url: string) => void
+}
+
+function AudioRecorder({ ticketId, onSaved }: AudioRecorderProps) {
+  const [recording,  setRecording]  = useState(false)
+  const [uploading,  setUploading]  = useState(false)
+  const [error,      setError]      = useState<string | null>(null)
+  const [savedUrl,   setSavedUrl]   = useState<string | null>(null)
+  const mediaRef  = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+
+  async function startRecording() {
+    setError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      const mr = new MediaRecorder(stream, { mimeType })
+      chunksRef.current = []
+      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
+      mr.onstop = () => { stream.getTracks().forEach(t => t.stop()); handleUpload(mimeType) }
+      mr.start()
+      mediaRef.current = mr
+      setRecording(true)
+    } catch {
+      setError('Por favor, libere o acesso ao microfone nas configurações do navegador para gravar áudios.')
+    }
+  }
+
+  function stopRecording() {
+    mediaRef.current?.stop()
+    setRecording(false)
+  }
+
+  async function handleUpload(mimeType: string) {
+    setUploading(true)
+    const ext  = mimeType.includes('webm') ? 'webm' : 'mp4'
+    const blob = new Blob(chunksRef.current, { type: mimeType })
+    const path = `tickets/${ticketId}/audio.${ext}`
+    const { data, error: upErr } = await supabase.storage
+      .from('audios')
+      .upload(path, blob, { upsert: true, contentType: mimeType })
+    if (upErr) { setError(`Erro ao enviar áudio: ${upErr.message}`); setUploading(false); return }
+    const url = supabase.storage.from('audios').getPublicUrl(data.path).data.publicUrl
+    await supabase.from('tickets').update({ audio_url: url }).eq('id', ticketId)
+    setSavedUrl(url)
+    onSaved(url)
+    setUploading(false)
+  }
+
+  if (savedUrl) return <AudioPlayer url={savedUrl} />
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={recording ? stopRecording : startRecording}
+        disabled={uploading}
+        className={[
+          'w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-60',
+          recording
+            ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
+            : 'bg-slate-100 hover:bg-slate-200 text-slate-700',
+        ].join(' ')}
+      >
+        {uploading ? (
+          <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
+        ) : recording ? (
+          <><MicOff className="w-4 h-4" /> Parar gravação</>
+        ) : (
+          <><Mic className="w-4 h-4" /> Gravar áudio</>
+        )}
+      </button>
+      {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+    </div>
+  )
+}
+
 // ── TicketItem ────────────────────────────────────────────────────────────────
 interface TicketItemProps {
   ticket: TicketWithRelations
@@ -179,6 +269,12 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
             <pre className="text-xs text-slate-500 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-xl p-3">
               {ticket.report}
             </pre>
+          </div>
+        )}
+        {ticket.audio_url && (
+          <div className="px-4 pb-4">
+            <p className="text-xs font-semibold text-slate-500 mb-1.5">Audio</p>
+            <AudioPlayer url={ticket.audio_url} />
           </div>
         )}
       </div>
@@ -272,6 +368,16 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
           onChange={e => onChange({ observacao: e.target.value, changed: true })}
           placeholder={form.status === 'pendente' ? 'Ex: Aguardando material...' : 'O que foi realizado...'}
           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-brand-red focus:ring-2 focus:ring-brand-red/20 resize-none transition" />
+      </div>
+
+      {/* Audio — visivel em qualquer status */}
+      <div className="px-4 pb-3">
+        <p className="text-xs font-semibold text-slate-600 mb-2">
+          Audio <span className="font-normal text-slate-400">(opcional)</span>
+        </p>
+        {ticket.audio_url
+          ? <AudioPlayer url={ticket.audio_url} />
+          : <AudioRecorder ticketId={ticket.id} onSaved={() => {}} />}
       </div>
 
       {/* Foto + Assinatura — apenas quando Concluido */}

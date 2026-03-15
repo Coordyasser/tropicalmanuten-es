@@ -17,6 +17,7 @@ export interface TicketWithRelations {
   report: string | null
   photo_url: string | null
   signature_url: string | null
+  audio_url: string | null
   completed_at: string | null
   project: { name: string } | null
 }
@@ -43,7 +44,7 @@ export function useTickets(): UseTicketsResult {
       .select(`
         id, project_id, tech_id, scheduled_date, scheduled_time,
         description, unidade, bloco, categoria, status,
-        report, photo_url, signature_url, completed_at,
+        report, photo_url, signature_url, audio_url, completed_at,
         project:projects ( name )
       `)
       .eq('tech_id', user.id)

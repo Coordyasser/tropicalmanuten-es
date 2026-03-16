@@ -188,12 +188,13 @@ function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorderProps) 
   async function uploadBlob(mimeType: string, blob?: Blob) {
     setUploading(true)
     const ext      = mimeType.includes('webm') ? 'webm' : mimeType.includes('mp4') ? 'mp4' : mimeType.split('/')[1] ?? 'mp3'
-    const filename = targetColumn === 'resolution_audio_url' ? `resolution.${ext}` : `audio.${ext}`
-    const path     = `tickets/${ticketId}/${filename}`
+    const prefix   = targetColumn === 'resolution_audio_url' ? 'resolution' : 'audio'
+    // Timestamp no nome evita colisão e elimina a necessidade de upsert (só INSERT)
+    const path     = `tickets/${ticketId}/${prefix}_${Date.now()}.${ext}`
     const data_blob = blob ?? new Blob(chunksRef.current, { type: mimeType })
     const { data, error: upErr } = await supabase.storage
       .from('audios')
-      .upload(path, data_blob, { upsert: true, contentType: mimeType })
+      .upload(path, data_blob, { contentType: mimeType })
     if (upErr) { setError(`Erro ao enviar áudio: ${upErr.message}`); setUploading(false); return }
     const url = supabase.storage.from('audios').getPublicUrl(data.path).data.publicUrl
     await supabase.from('tickets').update({ [targetColumn]: url }).eq('id', ticketId)

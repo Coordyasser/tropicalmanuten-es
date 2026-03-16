@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   AlertCircle, ArrowLeft, Camera, CheckCircle2, Clock,
-  Loader2, Lock, MapPin, Mic, MicOff, Paperclip, Timer, Trash2, Volume2, X,
+  Images, Loader2, Lock, MapPin, Mic, MicOff, Paperclip, Timer, Trash2, Volume2, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import SignatureCanvas from '../../components/SignatureCanvas'
@@ -266,8 +266,9 @@ interface TicketItemProps {
 }
 
 function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketItemProps) {
-  const photoInputRef = useRef<HTMLInputElement>(null)
-  const isConcluido   = ticket.status === 'concluido'
+  const cameraInputRef  = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
+  const isConcluido     = ticket.status === 'concluido'
   const isPendente    = ticket.status === 'pendente'
 
   // Local audio state — initialised from DB, cleared on delete, set on new upload
@@ -290,7 +291,8 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
   }
   function removePhoto() {
     onChange({ photoFile: null, photoPreview: null })
-    if (photoInputRef.current) photoInputRef.current.value = ''
+    if (cameraInputRef.current)  cameraInputRef.current.value  = ''
+    if (galleryInputRef.current) galleryInputRef.current.value = ''
   }
 
   // ── Read-only: already concluded ──────────────────────────────────────────
@@ -470,9 +472,10 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
             <p className="text-xs font-semibold text-slate-600 mb-2">
               Foto <span className="font-normal text-slate-400">(opcional)</span>
             </p>
-            {/* Sem capture="environment" — o sistema abre a seleção de câmera ou galeria */}
-            <input ref={photoInputRef} type="file" accept="image/*"
-              className="hidden" onChange={handlePhotoChange} />
+            {/* input com capture → abre câmera diretamente */}
+            <input ref={cameraInputRef}  type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoChange} />
+            {/* input sem capture → abre galeria */}
+            <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
             {form.photoPreview ? (
               <div className="relative rounded-xl overflow-hidden border border-slate-200">
                 <img src={form.photoPreview} alt="Foto" className="w-full h-40 object-cover" />
@@ -482,11 +485,16 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
                 </button>
               </div>
             ) : (
-              <button type="button" onClick={() => photoInputRef.current?.click()}
-                className="w-full h-24 border-2 border-dashed border-slate-300 rounded-xl bg-white flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-brand-red hover:text-brand-red transition-colors active:scale-[0.98]">
-                <Camera className="w-6 h-6" />
-                <span className="text-xs font-medium">Câmera ou Galeria</span>
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => cameraInputRef.current?.click()}
+                  className="flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all active:scale-[0.98]">
+                  <Camera className="w-4 h-4" /> Câmera
+                </button>
+                <button type="button" onClick={() => galleryInputRef.current?.click()}
+                  className="flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all active:scale-[0.98]">
+                  <Images className="w-4 h-4" /> Galeria
+                </button>
+              </div>
             )}
           </div>
 

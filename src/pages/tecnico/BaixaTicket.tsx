@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   AlertCircle, ArrowLeft, Camera, CheckCircle2, Clock,
-  Images, Loader2, Lock, MapPin, Mic, MicOff, Paperclip, Timer, Trash2, Volume2, X,
+  Image, Loader2, Lock, MapPin, Mic, MicOff, Paperclip, Timer, Trash2, Volume2, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import SignatureCanvas from '../../components/SignatureCanvas'
@@ -235,20 +235,21 @@ function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorderProps) 
   return (
     <div className="space-y-2">
       <input ref={fileInputRef} type="file" accept="audio/*" hidden onChange={handleFileSelect} />
-      <div className="grid grid-cols-2 gap-2">
+      <div className="flex gap-2">
         <button
           type="button"
           onClick={startRecording}
-          className="flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all active:scale-[0.98]"
+          className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all active:scale-[0.98]"
         >
-          <Mic className="w-4 h-4" /> Gravar áudio
+          <Mic className="w-4 h-4" /> Gravar Áudio
         </button>
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all active:scale-[0.98]"
+          title="Anexar arquivo de áudio"
+          className="flex items-center justify-center px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 transition-all active:scale-[0.98]"
         >
-          <Paperclip className="w-4 h-4" /> Anexar áudio
+          <Paperclip className="w-4 h-4" />
         </button>
       </div>
       {error && <p className="text-xs text-red-500 text-center">{error}</p>}
@@ -485,14 +486,15 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex gap-2">
                 <button type="button" onClick={() => cameraInputRef.current?.click()}
-                  className="flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all active:scale-[0.98]">
-                  <Camera className="w-4 h-4" /> Câmera
+                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all active:scale-[0.98]">
+                  <Camera className="w-4 h-4" /> Tirar Foto
                 </button>
                 <button type="button" onClick={() => galleryInputRef.current?.click()}
-                  className="flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all active:scale-[0.98]">
-                  <Images className="w-4 h-4" /> Galeria
+                  title="Anexar foto da galeria"
+                  className="flex items-center justify-center px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 transition-all active:scale-[0.98]">
+                  <Image className="w-4 h-4" />
                 </button>
               </div>
             )}

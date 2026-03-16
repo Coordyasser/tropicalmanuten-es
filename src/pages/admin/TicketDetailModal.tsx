@@ -144,14 +144,19 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
             <p className="text-slate-700 text-sm leading-relaxed bg-slate-50 rounded-xl p-3">{ticket.description}</p>
           </div>
 
-          {/* Report */}
-          {ticket.report && (
+          {/* Report + Resolution notes */}
+          {(ticket.report || ticket.resolution_notes) && (
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <FileText className="w-4 h-4 text-emerald-500" />
                 <span className="text-sm font-semibold text-slate-600">Relatorio do tecnico</span>
               </div>
-              <pre className="text-slate-700 text-sm leading-relaxed bg-emerald-50 rounded-xl p-3 whitespace-pre-wrap font-sans">{ticket.report}</pre>
+              <pre className="text-slate-700 text-sm leading-relaxed bg-emerald-50 rounded-xl p-3 whitespace-pre-wrap font-sans">
+                {[
+                  ticket.report,
+                  ticket.resolution_notes ? `--- Resolução ---\n${ticket.resolution_notes}` : null,
+                ].filter(Boolean).join('\n\n')}
+              </pre>
             </div>
           )}
 
@@ -171,15 +176,25 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
           )}
 
           {/* Audio */}
-          {ticket.audio_url && (
+          {(ticket.audio_url || ticket.resolution_audio_url) && (
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <Volume2 className="w-4 h-4 text-slate-400" />
                 <span className="text-sm font-semibold text-slate-600">Audio</span>
               </div>
-              <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
-                <Volume2 className="w-4 h-4 text-blue-500 shrink-0" />
-                <audio controls src={ticket.audio_url} className="flex-1 h-8 min-w-0" />
+              <div className="space-y-2">
+                {ticket.audio_url && (
+                  <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
+                    <Volume2 className="w-4 h-4 text-blue-500 shrink-0" />
+                    <audio controls src={ticket.audio_url} className="flex-1 h-8 min-w-0" />
+                  </div>
+                )}
+                {ticket.resolution_audio_url && (
+                  <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
+                    <Volume2 className="w-4 h-4 text-blue-500 shrink-0" />
+                    <audio controls src={ticket.resolution_audio_url} className="flex-1 h-8 min-w-0" />
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -136,10 +136,11 @@ export function AudioPlayer({ url }: { url: string }) {
 // ── AudioRecorder ─────────────────────────────────────────────────────────────
 interface AudioRecorderProps {
   ticketId: string
+  targetColumn: 'audio_url' | 'resolution_audio_url'
   onSaved: (url: string) => void
 }
 
-function AudioRecorder({ ticketId, onSaved }: AudioRecorderProps) {
+function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorderProps) {
   const [recording,  setRecording]  = useState(false)
   const [uploading,  setUploading]  = useState(false)
   const [error,      setError]      = useState<string | null>(null)
@@ -173,13 +174,15 @@ function AudioRecorder({ ticketId, onSaved }: AudioRecorderProps) {
     setUploading(true)
     const ext  = mimeType.includes('webm') ? 'webm' : 'mp4'
     const blob = new Blob(chunksRef.current, { type: mimeType })
-    const path = `tickets/${ticketId}/audio.${ext}`
+    // Use different filename to avoid collision between diagnostic and resolution audios
+    const filename = targetColumn === 'resolution_audio_url' ? `resolution.${ext}` : `audio.${ext}`
+    const path = `tickets/${ticketId}/${filename}`
     const { data, error: upErr } = await supabase.storage
       .from('audios')
       .upload(path, blob, { upsert: true, contentType: mimeType })
     if (upErr) { setError(`Erro ao enviar áudio: ${upErr.message}`); setUploading(false); return }
     const url = supabase.storage.from('audios').getPublicUrl(data.path).data.publicUrl
-    await supabase.from('tickets').update({ audio_url: url }).eq('id', ticketId)
+    await supabase.from('tickets').update({ [targetColumn]: url }).eq('id', ticketId)
     setSavedUrl(url)
     onSaved(url)
     setUploading(false)
@@ -263,18 +266,24 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
           </div>
           <ElapsedBadge ticket={ticket} />
         </div>
-        {ticket.report && (
+        {(ticket.report || ticket.resolution_notes) && (
           <div className="px-4 pb-3">
             <p className="text-xs font-semibold text-slate-500 mb-1.5">Relatorio</p>
             <pre className="text-xs text-slate-500 whitespace-pre-wrap leading-relaxed bg-slate-50 rounded-xl p-3">
-              {ticket.report}
+              {[
+                ticket.report,
+                ticket.resolution_notes ? `--- Resolução ---\n${ticket.resolution_notes}` : null,
+              ].filter(Boolean).join('\n\n')}
             </pre>
           </div>
         )}
-        {ticket.audio_url && (
+        {(ticket.audio_url || ticket.resolution_audio_url) && (
           <div className="px-4 pb-4">
             <p className="text-xs font-semibold text-slate-500 mb-1.5">Audio</p>
-            <AudioPlayer url={ticket.audio_url} />
+            <div className="space-y-2">
+              {ticket.audio_url && <AudioPlayer url={ticket.audio_url} />}
+              {ticket.resolution_audio_url && <AudioPlayer url={ticket.resolution_audio_url} />}
+            </div>
           </div>
         )}
       </div>
@@ -370,14 +379,27 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-brand-red focus:ring-2 focus:ring-brand-red/20 resize-none transition" />
       </div>
 
-      {/* Audio — visivel em qualquer status */}
+      {/* Audio — salva em audio_url (pendente) ou resolution_audio_url (concluido) */}
       <div className="px-4 pb-3">
         <p className="text-xs font-semibold text-slate-600 mb-2">
           Audio <span className="font-normal text-slate-400">(opcional)</span>
         </p>
+        {/* Áudio de diagnóstico (audio_url) */}
         {ticket.audio_url
           ? <AudioPlayer url={ticket.audio_url} />
-          : <AudioRecorder ticketId={ticket.id} onSaved={() => {}} />}
+          : form.status === 'pendente' && (
+              <AudioRecorder ticketId={ticket.id} targetColumn="audio_url" onSaved={() => {}} />
+            )
+        }
+        {/* Áudio de resolução (resolution_audio_url) — apenas ao concluir */}
+        {form.status === 'concluido' && (
+          <div className={ticket.audio_url ? 'mt-2' : ''}>
+            {ticket.resolution_audio_url
+              ? <AudioPlayer url={ticket.resolution_audio_url} />
+              : <AudioRecorder ticketId={ticket.id} targetColumn="resolution_audio_url" onSaved={() => {}} />
+            }
+          </div>
+        )}
       </div>
 
       {/* Foto + Assinatura — apenas quando Concluido */}
@@ -516,28 +538,38 @@ export default function BaixaTicket() {
       if (sigd) { signatureUrl = supabase.storage.from('photos').getPublicUrl(sigd.path).data.publicUrl }
     }
 
-    // ── Report ────────────────────────────────────────────────────────────
+    // ── Report vs Resolution notes ────────────────────────────────────────
+    // Pendente: text goes to `report` (diagnostic log, prepended to history).
+    // Concluindo: text goes to `resolution_notes` — NEVER overwrite `report`.
     let report: string | null = editableTicket.report
+    let resolutionNotes: string | null = editableTicket.resolution_notes ?? null
     if (form.observacao.trim()) {
-      report = isConcluding
-        ? form.observacao.trim()
-        : buildReport(form.observacao, editableTicket.report)
+      if (isConcluding) {
+        resolutionNotes = form.observacao.trim()
+      } else {
+        report = buildReport(form.observacao, editableTicket.report)
+      }
     }
 
     // ── Save editable (most recent) ticket ───────────────────────────────
     // Duration: only if it's also the oldest in the group (single-ticket case)
+    const updatePayload: Database['public']['Tables']['tickets']['Update'] = {
+      status:        form.status,
+      report,
+      completed_at:  isConcluding ? concludedAt.toISOString() : null,
+      duration:      isConcluding && isOldestInGroup
+                       ? formatDuration(startAt, concludedAt)
+                       : null,
+      photo_url:     isConcluding ? photoUrl     : editableTicket.photo_url,
+      signature_url: isConcluding ? signatureUrl : editableTicket.signature_url,
+    }
+    if (isConcluding) {
+      updatePayload.resolution_notes = resolutionNotes
+    }
+
     const { error: editErr } = await supabase
       .from('tickets')
-      .update({
-        status:        form.status,
-        report,
-        completed_at:  isConcluding ? concludedAt.toISOString() : null,
-        duration:      isConcluding && isOldestInGroup
-                         ? formatDuration(startAt, concludedAt)
-                         : null,
-        photo_url:     isConcluding ? photoUrl     : editableTicket.photo_url,
-        signature_url: isConcluding ? signatureUrl : editableTicket.signature_url,
-      } satisfies Database['public']['Tables']['tickets']['Update'])
+      .update(updatePayload)
       .eq('id', editableTicket.id)
 
     if (editErr) { setSubmitError(editErr.message); setSubmitting(false); return }

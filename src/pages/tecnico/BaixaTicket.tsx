@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   AlertCircle, ArrowLeft, Camera, CheckCircle2, Clock,
-  Loader2, Lock, MapPin, Mic, MicOff, Timer, Volume2, X,
+  Loader2, Lock, MapPin, Mic, MicOff, Paperclip, Timer, Trash2, Volume2, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import SignatureCanvas from '../../components/SignatureCanvas'
@@ -32,11 +32,6 @@ function buildReport(newObs: string, old: string | null): string {
   return old ? `${entry}\n\n${old}` : entry
 }
 
-/** Combine scheduled_date + scheduled_time into a Date, or midnight if no time.
- *  Supabase `time` columns may return "HH:MM:SS", so we take only the first 5
- *  characters ("HH:MM") before constructing the ISO string, preventing the
- *  Invalid Date that results from "YYYY-MM-DDTHH:MM:SS:00".
- */
 function parseScheduledAt(date: string, time: string | null): Date {
   if (!date) return new Date(NaN)
   const hhmm = time ? time.slice(0, 5) : '00:00'
@@ -44,7 +39,6 @@ function parseScheduledAt(date: string, time: string | null): Date {
   return isNaN(dt.getTime()) ? new Date(`${date}T00:00:00`) : dt
 }
 
-/** Format elapsed milliseconds as "Xh Ym" or "Ym" or "< 1min". */
 function formatElapsed(startAt: Date, endAt: Date): string {
   const diffMs = endAt.getTime() - startAt.getTime()
   if (diffMs < 0) return '—'
@@ -55,9 +49,6 @@ function formatElapsed(startAt: Date, endAt: Date): string {
   return h === 0 ? `${m}min` : m === 0 ? `${h}h` : `${h}h ${m}min`
 }
 
-/** Format elapsed time as a compact "2h 15m" / "45m" string for storage.
- *  Returns "—" if either Date is invalid (NaN guard).
- */
 function formatDuration(startAt: Date, endAt: Date): string {
   if (isNaN(startAt.getTime()) || isNaN(endAt.getTime())) return '—'
   const totalMins = Math.max(0, Math.floor((endAt.getTime() - startAt.getTime()) / 60_000))
@@ -68,7 +59,6 @@ function formatDuration(startAt: Date, endAt: Date): string {
   return `${h}h ${m}m`
 }
 
-/** Derive the most-recent editable ticket id among non-concluded tickets. */
 function mostRecentEditableId(tickets: TicketWithRelations[]): string | null {
   const editable = tickets.filter(t => t.status !== 'concluido')
   if (editable.length === 0) return null
@@ -77,6 +67,21 @@ function mostRecentEditableId(tickets: TicketWithRelations[]): string | null {
     const tKey = t.scheduled_date   + (t.scheduled_time   ?? '')
     return tKey >= bKey ? t : best
   }).id
+}
+
+/** Extrai o caminho de storage a partir da URL pública e deleta o arquivo + limpa a coluna no DB. */
+async function deleteAudio(
+  ticketId: string,
+  column: 'audio_url' | 'resolution_audio_url',
+  url: string,
+): Promise<void> {
+  const marker = '/audios/'
+  const idx = url.indexOf(marker)
+  if (idx !== -1) {
+    const storagePath = url.slice(idx + marker.length).split('?')[0]
+    await supabase.storage.from('audios').remove([storagePath])
+  }
+  await supabase.from('tickets').update({ [column]: null }).eq('id', ticketId)
 }
 
 // ── StatusSelector ────────────────────────────────────────────────────────────
@@ -106,7 +111,7 @@ function ElapsedBadge({ ticket }: { ticket: TicketWithRelations }) {
   const isFixed  = Boolean(ticket.completed_at)
 
   useEffect(() => {
-    if (isFixed) return                                    // static duration, no interval
+    if (isFixed) return
     const id = setInterval(() => tick(n => n + 1), 60_000)
     return () => clearInterval(id)
   }, [isFixed])
@@ -124,11 +129,21 @@ function ElapsedBadge({ ticket }: { ticket: TicketWithRelations }) {
 }
 
 // ── AudioPlayer ───────────────────────────────────────────────────────────────
-export function AudioPlayer({ url }: { url: string }) {
+export function AudioPlayer({ url, onDelete }: { url: string; onDelete?: () => void }) {
   return (
     <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
       <Volume2 className="w-4 h-4 text-blue-500 shrink-0" />
       <audio controls src={url} className="flex-1 h-8 min-w-0" style={{ accentColor: '#C41820' }} />
+      {onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          title="Excluir áudio"
+          className="p-1.5 rounded-lg hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors shrink-0"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      )}
     </div>
   )
 }
@@ -144,9 +159,9 @@ function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorderProps) 
   const [recording,  setRecording]  = useState(false)
   const [uploading,  setUploading]  = useState(false)
   const [error,      setError]      = useState<string | null>(null)
-  const [savedUrl,   setSavedUrl]   = useState<string | null>(null)
-  const mediaRef  = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
+  const mediaRef    = useRef<MediaRecorder | null>(null)
+  const chunksRef   = useRef<Blob[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function startRecording() {
     setError(null)
@@ -156,7 +171,7 @@ function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorderProps) 
       const mr = new MediaRecorder(stream, { mimeType })
       chunksRef.current = []
       mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data) }
-      mr.onstop = () => { stream.getTracks().forEach(t => t.stop()); handleUpload(mimeType) }
+      mr.onstop = () => { stream.getTracks().forEach(t => t.stop()); uploadBlob(mimeType) }
       mr.start()
       mediaRef.current = mr
       setRecording(true)
@@ -170,47 +185,72 @@ function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorderProps) 
     setRecording(false)
   }
 
-  async function handleUpload(mimeType: string) {
+  async function uploadBlob(mimeType: string, blob?: Blob) {
     setUploading(true)
-    const ext  = mimeType.includes('webm') ? 'webm' : 'mp4'
-    const blob = new Blob(chunksRef.current, { type: mimeType })
-    // Use different filename to avoid collision between diagnostic and resolution audios
+    const ext      = mimeType.includes('webm') ? 'webm' : mimeType.includes('mp4') ? 'mp4' : mimeType.split('/')[1] ?? 'mp3'
     const filename = targetColumn === 'resolution_audio_url' ? `resolution.${ext}` : `audio.${ext}`
-    const path = `tickets/${ticketId}/${filename}`
+    const path     = `tickets/${ticketId}/${filename}`
+    const data_blob = blob ?? new Blob(chunksRef.current, { type: mimeType })
     const { data, error: upErr } = await supabase.storage
       .from('audios')
-      .upload(path, blob, { upsert: true, contentType: mimeType })
+      .upload(path, data_blob, { upsert: true, contentType: mimeType })
     if (upErr) { setError(`Erro ao enviar áudio: ${upErr.message}`); setUploading(false); return }
     const url = supabase.storage.from('audios').getPublicUrl(data.path).data.publicUrl
     await supabase.from('tickets').update({ [targetColumn]: url }).eq('id', ticketId)
-    setSavedUrl(url)
     onSaved(url)
     setUploading(false)
   }
 
-  if (savedUrl) return <AudioPlayer url={savedUrl} />
+  async function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setError(null)
+    await uploadBlob(file.type || 'audio/mpeg', file)
+    // reset so same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  if (uploading) {
+    return (
+      <div className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-slate-100 text-slate-500 text-sm font-semibold">
+        <Loader2 className="w-4 h-4 animate-spin" /> Enviando...
+      </div>
+    )
+  }
+
+  if (recording) {
+    return (
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={stopRecording}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-red-500 hover:bg-red-600 text-white animate-pulse transition-all active:scale-[0.98]"
+        >
+          <MicOff className="w-4 h-4" /> Parar gravação
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-2">
-      <button
-        type="button"
-        onClick={recording ? stopRecording : startRecording}
-        disabled={uploading}
-        className={[
-          'w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all active:scale-[0.98] disabled:opacity-60',
-          recording
-            ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
-            : 'bg-slate-100 hover:bg-slate-200 text-slate-700',
-        ].join(' ')}
-      >
-        {uploading ? (
-          <><Loader2 className="w-4 h-4 animate-spin" /> Enviando...</>
-        ) : recording ? (
-          <><MicOff className="w-4 h-4" /> Parar gravação</>
-        ) : (
-          <><Mic className="w-4 h-4" /> Gravar áudio</>
-        )}
-      </button>
+      <input ref={fileInputRef} type="file" accept="audio/*" hidden onChange={handleFileSelect} />
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={startRecording}
+          className="flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all active:scale-[0.98]"
+        >
+          <Mic className="w-4 h-4" /> Gravar áudio
+        </button>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all active:scale-[0.98]"
+        >
+          <Paperclip className="w-4 h-4" /> Anexar áudio
+        </button>
+      </div>
       {error && <p className="text-xs text-red-500 text-center">{error}</p>}
     </div>
   )
@@ -222,13 +262,26 @@ interface TicketItemProps {
   form: TicketForm
   sigRef: React.Ref<SignatureCanvasHandle>
   onChange: (patch: Partial<TicketForm>) => void
-  isQueueLocked: boolean   // true = pending but blocked by a more recent ticket
+  isQueueLocked: boolean
 }
 
 function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketItemProps) {
   const photoInputRef = useRef<HTMLInputElement>(null)
   const isConcluido   = ticket.status === 'concluido'
   const isPendente    = ticket.status === 'pendente'
+
+  // Local audio state — initialised from DB, cleared on delete, set on new upload
+  const [localAudioUrl,    setLocalAudioUrl]    = useState(ticket.audio_url)
+  const [localResAudioUrl, setLocalResAudioUrl] = useState(ticket.resolution_audio_url)
+  const [deletingAudio,    setDeletingAudio]    = useState<'audio_url' | 'resolution_audio_url' | null>(null)
+
+  async function handleDeleteAudio(column: 'audio_url' | 'resolution_audio_url', url: string) {
+    setDeletingAudio(column)
+    await deleteAudio(ticket.id, column, url)
+    if (column === 'audio_url') setLocalAudioUrl(null)
+    else setLocalResAudioUrl(null)
+    setDeletingAudio(null)
+  }
 
   function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -281,7 +334,7 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
           <div className="px-4 pb-4">
             <p className="text-xs font-semibold text-slate-500 mb-1.5">Audio</p>
             <div className="space-y-2">
-              {ticket.audio_url && <AudioPlayer url={ticket.audio_url} />}
+              {ticket.audio_url         && <AudioPlayer url={ticket.audio_url} />}
               {ticket.resolution_audio_url && <AudioPlayer url={ticket.resolution_audio_url} />}
             </div>
           </div>
@@ -290,7 +343,7 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
     )
   }
 
-  // ── Read-only: queued (pending but not the most recent) ───────────────────
+  // ── Read-only: queued ──────────────────────────────────────────────────────
   if (isQueueLocked) {
     return (
       <div className="bg-white rounded-2xl border border-amber-200 shadow-sm overflow-hidden opacity-70">
@@ -325,7 +378,7 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
     )
   }
 
-  // ── Editable view (aberto or pendente — most recent) ──────────────────────
+  // ── Editable view ──────────────────────────────────────────────────────────
   return (
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
 
@@ -349,7 +402,7 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
         <ElapsedBadge ticket={ticket} />
       </div>
 
-      {/* Historico anterior — para tickets pendentes */}
+      {/* Historico anterior */}
       {isPendente && ticket.report && (
         <div className="px-4 pt-3">
           <p className="text-xs font-semibold text-slate-500 mb-1.5">Historico anterior</p>
@@ -379,25 +432,33 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
           className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-brand-red focus:ring-2 focus:ring-brand-red/20 resize-none transition" />
       </div>
 
-      {/* Audio — salva em audio_url (pendente) ou resolution_audio_url (concluido) */}
+      {/* Audio — diagnóstico (audio_url) sempre visível; resolução (resolution_audio_url) ao concluir */}
       <div className="px-4 pb-3">
         <p className="text-xs font-semibold text-slate-600 mb-2">
           Audio <span className="font-normal text-slate-400">(opcional)</span>
         </p>
-        {/* Áudio de diagnóstico (audio_url) */}
-        {ticket.audio_url
-          ? <AudioPlayer url={ticket.audio_url} />
-          : form.status === 'pendente' && (
-              <AudioRecorder ticketId={ticket.id} targetColumn="audio_url" onSaved={() => {}} />
-            )
-        }
-        {/* Áudio de resolução (resolution_audio_url) — apenas ao concluir */}
+
+        {/* Áudio de diagnóstico */}
+        {localAudioUrl ? (
+          <AudioPlayer
+            url={localAudioUrl}
+            onDelete={deletingAudio === 'audio_url' ? undefined : () => handleDeleteAudio('audio_url', localAudioUrl)}
+          />
+        ) : form.status === 'pendente' && (
+          <AudioRecorder ticketId={ticket.id} targetColumn="audio_url" onSaved={url => setLocalAudioUrl(url)} />
+        )}
+
+        {/* Áudio de resolução — apenas ao concluir */}
         {form.status === 'concluido' && (
-          <div className={ticket.audio_url ? 'mt-2' : ''}>
-            {ticket.resolution_audio_url
-              ? <AudioPlayer url={ticket.resolution_audio_url} />
-              : <AudioRecorder ticketId={ticket.id} targetColumn="resolution_audio_url" onSaved={() => {}} />
-            }
+          <div className={localAudioUrl ? 'mt-2' : ''}>
+            {localResAudioUrl ? (
+              <AudioPlayer
+                url={localResAudioUrl}
+                onDelete={deletingAudio === 'resolution_audio_url' ? undefined : () => handleDeleteAudio('resolution_audio_url', localResAudioUrl)}
+              />
+            ) : (
+              <AudioRecorder ticketId={ticket.id} targetColumn="resolution_audio_url" onSaved={url => setLocalResAudioUrl(url)} />
+            )}
           </div>
         )}
       </div>
@@ -409,7 +470,8 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
             <p className="text-xs font-semibold text-slate-600 mb-2">
               Foto <span className="font-normal text-slate-400">(opcional)</span>
             </p>
-            <input ref={photoInputRef} type="file" accept="image/*" capture="environment"
+            {/* Sem capture="environment" — o sistema abre a seleção de câmera ou galeria */}
+            <input ref={photoInputRef} type="file" accept="image/*"
               className="hidden" onChange={handlePhotoChange} />
             {form.photoPreview ? (
               <div className="relative rounded-xl overflow-hidden border border-slate-200">
@@ -423,7 +485,7 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
               <button type="button" onClick={() => photoInputRef.current?.click()}
                 className="w-full h-24 border-2 border-dashed border-slate-300 rounded-xl bg-white flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-brand-red hover:text-brand-red transition-colors active:scale-[0.98]">
                 <Camera className="w-6 h-6" />
-                <span className="text-xs font-medium">Tirar foto</span>
+                <span className="text-xs font-medium">Câmera ou Galeria</span>
               </button>
             )}
           </div>
@@ -477,8 +539,7 @@ export default function BaixaTicket() {
     first.bloco   ? `Bl. ${first.bloco}`     : null,
   ].filter(Boolean).join(' / ')
 
-  // ── Queue logic: only the most recent editable ticket is unlocked ─────────
-  const editableId = mostRecentEditableId(tickets)
+  const editableId  = mostRecentEditableId(tickets)
   const hasEditable = editableId !== null
 
   function updateForm(id: string, patch: Partial<TicketForm>) {
@@ -494,23 +555,20 @@ export default function BaixaTicket() {
     const editableTicket = tickets.find(t => t.id === editableId)!
     const form           = forms.get(editableId)!
 
-    // Nothing changed — just go back
     if (!form.changed) { navigate('/tecnico', { replace: true }); return }
 
     const isConcluding = form.status === 'concluido'
     const concludedAt  = new Date()
     const startAt      = parseScheduledAt(editableTicket.scheduled_date, editableTicket.scheduled_time)
 
-    // Older non-concluded tickets in this group (sorted oldest → newest)
     const olderPending = tickets
       .filter(t => t.status !== 'concluido' && t.id !== editableId)
       .sort((a, b) => {
         const aKey = a.scheduled_date + (a.scheduled_time ?? '')
         const bKey = b.scheduled_date + (b.scheduled_time ?? '')
-        return aKey.localeCompare(bKey) // ascending = oldest first
+        return aKey.localeCompare(bKey)
       })
 
-    // The editable ticket is also the oldest when there are no older pending tickets
     const isOldestInGroup = olderPending.length === 0
 
     // ── Photo upload ──────────────────────────────────────────────────────
@@ -539,8 +597,6 @@ export default function BaixaTicket() {
     }
 
     // ── Report vs Resolution notes ────────────────────────────────────────
-    // Pendente: text goes to `report` (diagnostic log, prepended to history).
-    // Concluindo: text goes to `resolution_notes` — NEVER overwrite `report`.
     let report: string | null = editableTicket.report
     let resolutionNotes: string | null = editableTicket.resolution_notes ?? null
     if (form.observacao.trim()) {
@@ -551,8 +607,7 @@ export default function BaixaTicket() {
       }
     }
 
-    // ── Save editable (most recent) ticket ───────────────────────────────
-    // Duration: only if it's also the oldest in the group (single-ticket case)
+    // ── Save editable ticket ──────────────────────────────────────────────
     const updatePayload: Database['public']['Tables']['tickets']['Update'] = {
       status:        form.status,
       report,
@@ -574,8 +629,7 @@ export default function BaixaTicket() {
 
     if (editErr) { setSubmitError(editErr.message); setSubmitting(false); return }
 
-    // ── Cascade: close older pending tickets ─────────────────────────────
-    // Duration rule: oldest gets the duration, intermediaries get null
+    // ── Cascade: close older pending tickets ──────────────────────────────
     if (isConcluding && olderPending.length > 0) {
       for (let i = 0; i < olderPending.length; i++) {
         const t        = olderPending[i]
@@ -633,7 +687,6 @@ export default function BaixaTicket() {
         </div>
 
         {tickets.map(ticket => {
-          // A non-concluded ticket is queue-locked if it is NOT the most recent editable
           const isQueueLocked = ticket.status !== 'concluido' && ticket.id !== editableId
           return (
             <TicketItem
@@ -654,7 +707,6 @@ export default function BaixaTicket() {
         )}
       </main>
 
-      {/* Finalizar — hidden when all tickets are already concluded */}
       {hasEditable && (
         <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm border-t border-slate-200 p-4">
           <button type="button" disabled={submitting} onClick={handleFinalizar}

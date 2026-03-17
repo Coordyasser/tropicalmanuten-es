@@ -13,9 +13,27 @@ interface NovoTicketModalProps {
   onSuccess: () => void
 }
 
+const COMPLAINT_CHANNELS = ['WhatsApp', 'Telefone', 'E-mail', 'Presencial'] as const
+
 const EMPTY = {
   projectId: '', techId: '', scheduledDate: '', scheduledTime: '',
   unidade: '', bloco: '', description: '',
+  clientName: '', clientPhone: '', complaintChannel: '', initialProvision: '',
+}
+
+async function calcOsNumber(projectId: string, unidade: string, bloco: string): Promise<number> {
+  const { data } = await supabase
+    .from('tickets')
+    .select('os_number')
+    .eq('project_id', projectId)
+    .eq('unidade', unidade.trim())
+    .eq('bloco', bloco.trim() || '')
+    .neq('status', 'concluido')
+
+  if (!data || data.length === 0) return 1
+
+  const max = Math.max(...data.map(t => t.os_number ?? 0))
+  return max + 1
 }
 
 export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicketModalProps) {
@@ -41,6 +59,9 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
     }
     setSubmitting(true)
     setError(null)
+
+    const osNumber = await calcOsNumber(projectId, unidade, form.bloco)
+
     type TicketInsert = Database['public']['Tables']['tickets']['Insert']
     const payload: TicketInsert = {
       project_id: projectId,
@@ -51,7 +72,13 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
       bloco: form.bloco.trim() || null,
       description: description.trim(),
       status: 'aberto',
+      client_name: form.clientName.trim() || null,
+      client_phone: form.clientPhone.trim() || null,
+      complaint_channel: form.complaintChannel || null,
+      initial_provision: form.initialProvision.trim() || null,
+      os_number: osNumber,
     }
+
     const { data: inserted, error: insertErr } = await supabase
       .from('tickets').insert(payload).select('id').single()
     if (insertErr) { setError(insertErr.message); setSubmitting(false); return }
@@ -89,6 +116,8 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
               <span>{error}</span>
             </div>
           )}
+
+          {/* Empreendimento */}
           <div>
             <label className={labelCls}>Empreendimento *</label>
             <select value={form.projectId} onChange={set('projectId')} disabled={projLoading || submitting} className={inputCls}>
@@ -96,6 +125,8 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
+
+          {/* Unidade + Bloco */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Unidade *</label>
@@ -108,6 +139,8 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
                 placeholder="Ex: A, Torre 1" className={inputCls} />
             </div>
           </div>
+
+          {/* Técnico */}
           <div>
             <label className={labelCls}>Tecnico responsavel *</label>
             <select value={form.techId} onChange={set('techId')} disabled={techLoading || submitting} className={inputCls}>
@@ -115,6 +148,8 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
               {tecnicos.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </div>
+
+          {/* Data + Horário */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Data agendada *</label>
@@ -127,12 +162,47 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
                 disabled={submitting} className={inputCls} />
             </div>
           </div>
+
+          {/* Nome + Contato do cliente */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Nome do cliente</label>
+              <input type="text" value={form.clientName} onChange={set('clientName')} disabled={submitting}
+                placeholder="Ex: João Silva" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Contato do cliente</label>
+              <input type="text" value={form.clientPhone} onChange={set('clientPhone')} disabled={submitting}
+                placeholder="Ex: (11) 99999-9999" className={inputCls} />
+            </div>
+          </div>
+
+          {/* Via da Reclamação */}
+          <div>
+            <label className={labelCls}>Via da reclamação</label>
+            <select value={form.complaintChannel} onChange={set('complaintChannel')} disabled={submitting} className={inputCls}>
+              <option value="">Selecione o canal</option>
+              {COMPLAINT_CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {/* Descrição */}
           <div>
             <label className={labelCls}>Descricao *</label>
             <textarea value={form.description} onChange={set('description')} disabled={submitting}
               rows={3} placeholder="Descreva o servico a ser realizado..."
               className={`${inputCls} resize-none`} />
           </div>
+
+          {/* Providência Inicial */}
+          <div>
+            <label className={labelCls}>Providência inicial</label>
+            <textarea value={form.initialProvision} onChange={set('initialProvision')} disabled={submitting}
+              rows={2} placeholder="Ex: Enviado técnico para vistoria..."
+              className={`${inputCls} resize-none`} />
+          </div>
+
+          {/* Ações */}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} disabled={submitting}
               className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm font-medium disabled:opacity-50">

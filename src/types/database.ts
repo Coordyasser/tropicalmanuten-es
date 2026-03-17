@@ -42,6 +42,11 @@ export interface Database {
           resolution_audio_url: string | null
           completed_at: string | null
           duration: string | null
+          client_name: string | null
+          client_phone: string | null
+          complaint_channel: string | null
+          initial_provision: string | null
+          os_number: number | null
         }
         Insert: {
           id?: string
@@ -62,6 +67,11 @@ export interface Database {
           resolution_audio_url?: string | null
           completed_at?: string | null
           duration?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          complaint_channel?: string | null
+          initial_provision?: string | null
+          os_number?: number | null
         }
         Update: {
           id?: string
@@ -82,6 +92,11 @@ export interface Database {
           resolution_audio_url?: string | null
           completed_at?: string | null
           duration?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          complaint_channel?: string | null
+          initial_provision?: string | null
+          os_number?: number | null
         }
         Relationships: []
       }

@@ -3,7 +3,7 @@ import type { ChangeEvent } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   AlertCircle, ArrowLeft, Camera, CheckCircle2, Clock,
-  Image, Loader2, Lock, MapPin, Mic, MicOff, Paperclip, Timer, Trash2, Volume2, X,
+  FileDown, Image, Loader2, Lock, MapPin, Mic, MicOff, Paperclip, Timer, Trash2, Volume2, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import SignatureCanvas from '../../components/SignatureCanvas'
@@ -341,6 +341,15 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
               {ticket.audio_url         && <AudioPlayer url={ticket.audio_url} />}
               {ticket.resolution_audio_url && <AudioPlayer url={ticket.resolution_audio_url} />}
             </div>
+          </div>
+        )}
+        {ticket.os_pdf_url && (
+          <div className="px-4 pb-4">
+            <a href={ticket.os_pdf_url} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-brand-red hover:bg-brand-red-dark text-white font-semibold text-sm transition-colors">
+              <FileDown className="w-4 h-4" />
+              Ver Ordem de Serviço
+            </a>
           </div>
         )}
       </div>

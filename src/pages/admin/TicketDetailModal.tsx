@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, CalendarDays, ExternalLink, MapPin, User, FileText, Camera, PenLine, Tag, Clock, Volume2 } from 'lucide-react'
+import { X, CalendarDays, ExternalLink, MapPin, User, FileText, Camera, PenLine, Tag, Clock, Volume2, FileDown } from 'lucide-react'
 import type { AdminTicket } from '../../hooks/useAdminTickets'
 
 interface TicketDetailModalProps {
@@ -200,9 +200,16 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
           )}
         </div>
 
-        <div className="px-6 pb-6">
+        <div className="px-6 pb-6 flex gap-3">
+          {ticket.os_pdf_url && (
+            <a href={ticket.os_pdf_url} target="_blank" rel="noopener noreferrer"
+              className="flex-1 py-2.5 rounded-xl bg-brand-red hover:bg-brand-red-dark text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2">
+              <FileDown className="w-4 h-4" />
+              Ver O.S.
+            </a>
+          )}
           <button onClick={onClose}
-            className="w-full py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm font-medium">
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm font-medium">
             Fechar
           </button>
         </div>

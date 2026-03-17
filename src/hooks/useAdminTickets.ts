@@ -19,6 +19,8 @@ export interface AdminTicket {
   audio_url: string | null
   resolution_notes: string | null
   resolution_audio_url: string | null
+  os_number: number | null
+  os_pdf_url: string | null
   project: { name: string } | null
   technician: { id: string; name: string } | null
 }
@@ -45,6 +47,7 @@ export function useAdminTickets(): UseAdminTicketsResult {
         description, unidade, bloco, categoria,
         status, report, photo_url, signature_url, audio_url,
         resolution_notes, resolution_audio_url,
+        os_number, os_pdf_url,
         project:projects ( name ),
         technician:profiles ( id, name )
       `)

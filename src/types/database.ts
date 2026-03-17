@@ -47,6 +47,7 @@ export interface Database {
           complaint_channel: string | null
           initial_provision: string | null
           os_number: number | null
+          os_pdf_url: string | null
         }
         Insert: {
           id?: string
@@ -72,6 +73,7 @@ export interface Database {
           complaint_channel?: string | null
           initial_provision?: string | null
           os_number?: number | null
+          os_pdf_url?: string | null
         }
         Update: {
           id?: string
@@ -97,6 +99,7 @@ export interface Database {
           complaint_channel?: string | null
           initial_provision?: string | null
           os_number?: number | null
+          os_pdf_url?: string | null
         }
         Relationships: []
       }

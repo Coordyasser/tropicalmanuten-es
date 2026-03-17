@@ -6,6 +6,8 @@ import { useProjects } from '../../hooks/useProjects'
 import { useTecnicos } from '../../hooks/useTecnicos'
 import type { Database } from '../../types/database'
 import { categorizeTicket } from '../../lib/categorizeTicket'
+import { generateAndUploadOs } from '../../lib/generateOsPdf'
+import type { OsData } from '../../lib/generateOsPdf'
 
 interface NovoTicketModalProps {
   open: boolean
@@ -83,8 +85,26 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
       .from('tickets').insert(payload).select('id').single()
     if (insertErr) { setError(insertErr.message); setSubmitting(false); return }
 
-    // Auto-categorize in background — do not block the UI
+    // Background tasks: categorize + generate OS PDF — do not block the UI
     if (inserted?.id) {
+      const selectedProject = projects.find(p => p.id === projectId)
+      const osData: OsData = {
+        ticketId: inserted.id,
+        projectName: selectedProject?.name ?? '',
+        unidade: unidade.trim(),
+        bloco: form.bloco.trim() || null,
+        clientName: form.clientName.trim() || null,
+        clientPhone: form.clientPhone.trim() || null,
+        osNumber,
+        complaintChannel: form.complaintChannel || null,
+        scheduledDate: scheduledDate,
+        scheduledTime: form.scheduledTime || null,
+        description: description.trim(),
+        initialProvision: form.initialProvision.trim() || null,
+      }
+      generateAndUploadOs(osData).then(url => {
+        if (url) supabase.from('tickets').update({ os_pdf_url: url }).eq('id', inserted.id)
+      })
       categorizeTicket(description.trim()).then(categoria =>
         supabase.from('tickets').update({ categoria }).eq('id', inserted.id)
       )

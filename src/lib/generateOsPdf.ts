@@ -259,9 +259,9 @@ export async function generateAndUploadOs(data: OsData): Promise<string | null> 
   try {
     const blob = await buildOsPdf(data)
 
-    const projectUpper = data.projectName.toUpperCase()
-    const blocoStr = data.bloco ? ` ${data.bloco}` : ''
-    const fileName = `${projectUpper} ${data.unidade}${blocoStr} Nº DA O. S ${padOs(data.osNumber)}.pdf`
+    const projectSlug = data.projectName.toUpperCase().replace(/\s+/g, '_')
+    const blocoStr = data.bloco ? `_${data.bloco}` : ''
+    const fileName = `OS_${padOs(data.osNumber)}_${projectSlug}_${data.unidade}${blocoStr}.pdf`
     const path = `${data.ticketId}/${fileName}`
 
     const { data: uploaded, error } = await supabase.storage

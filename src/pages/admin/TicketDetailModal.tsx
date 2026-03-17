@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, CalendarDays, ExternalLink, MapPin, User, FileText, Camera, PenLine, Tag, Clock, Volume2, FileDown } from 'lucide-react'
+import { X, CalendarDays, ExternalLink, MapPin, User, FileText, Camera, PenLine, Tag, Clock, Volume2, FileDown, Phone, MessageSquare, Hash } from 'lucide-react'
 import type { AdminTicket } from '../../hooks/useAdminTickets'
 
 interface TicketDetailModalProps {
@@ -88,6 +88,20 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
 
           {/* Info grid */}
           <div className="grid grid-cols-1 gap-3">
+
+            {/* OS Number */}
+            {ticket.os_number != null && (
+              <div className="flex items-start gap-3 p-3 bg-brand-red/5 border border-brand-red/20 rounded-xl">
+                <Hash className="w-4 h-4 text-brand-red mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs text-slate-400 font-medium">Nº da O.S.</p>
+                  <p className="text-slate-700 text-sm font-bold">
+                    {String(ticket.os_number).padStart(2, '0')}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">
               <CalendarDays className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
               <div>
@@ -102,6 +116,7 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
                 </p>
               </div>
             </div>
+
             <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">
               <MapPin className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
               <div>
@@ -117,6 +132,7 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
                 </p>
               </div>
             </div>
+
             <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">
               <User className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
               <div>
@@ -124,6 +140,30 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
                 <p className="text-slate-700 text-sm font-medium">{ticket.technician?.name ?? '—'}</p>
               </div>
             </div>
+
+            {/* Client info */}
+            {(ticket.client_name || ticket.client_phone) && (
+              <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">
+                <Phone className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-slate-400 font-medium">Cliente</p>
+                  {ticket.client_name && <p className="text-slate-700 text-sm font-medium">{ticket.client_name}</p>}
+                  {ticket.client_phone && <p className="text-slate-500 text-xs">{ticket.client_phone}</p>}
+                </div>
+              </div>
+            )}
+
+            {/* Via da reclamação */}
+            {ticket.complaint_channel && (
+              <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">
+                <MessageSquare className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs text-slate-400 font-medium">Via da reclamação</p>
+                  <p className="text-slate-700 text-sm font-medium">{ticket.complaint_channel}</p>
+                </div>
+              </div>
+            )}
+
             {ticket.categoria && (
               <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">
                 <Tag className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
@@ -134,6 +174,17 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
               </div>
             )}
           </div>
+
+          {/* Providência inicial */}
+          {ticket.initial_provision && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <FileText className="w-4 h-4 text-slate-400" />
+                <span className="text-sm font-semibold text-slate-600">Providência inicial</span>
+              </div>
+              <p className="text-slate-700 text-sm leading-relaxed bg-slate-50 rounded-xl p-3">{ticket.initial_provision}</p>
+            </div>
+          )}
 
           {/* Description */}
           <div>

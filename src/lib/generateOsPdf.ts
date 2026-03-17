@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf'
+import { jsPDF } from 'jspdf'
 import { supabase } from './supabase'
 
 export interface OsData {
@@ -29,7 +29,7 @@ function padOs(n: number): string {
 
 async function logoAsBase64(): Promise<string | null> {
   try {
-    const res = await fetch('/logo tropical.jpg.jpeg')
+    const res = await fetch('/logo%20tropical.jpg.jpeg')
     if (!res.ok) return null
     const blob = await res.blob()
     return await new Promise<string>((resolve, reject) => {
@@ -100,21 +100,27 @@ export async function buildOsPdf(data: OsData): Promise<Blob> {
   const F_DT_H  = 8   // footer "Data" row height
 
   // Column widths – each row sums to W=190
+  function xPos(widths: number[]): number[] {
+    const xs = [L]
+    for (let i = 1; i < widths.length; i++) xs.push(xs[i - 1] + widths[i - 1])
+    return xs
+  }
+
   // Section 1 – 4 cols: Empreendimento | N°.Apto | Cliente | Contato
   const C1W = [67, 28, 50, 45] // Σ=190
-  const C1X = C1W.reduce<number[]>((acc, w, i) => [...acc, (acc[i - 1] ?? L) + (i ? C1W[i - 1] : 0)], [L])
+  const C1X = xPos(C1W)
 
   // Section 2 – 5 cols: Data | Via | N°OS | Vistoria | Serviço
   const C2W = [28, 35, 22, 40, 65] // Σ=190
-  const C2X = C2W.reduce<number[]>((acc, w, i) => [...acc, (acc[i - 1] ?? L) + (i ? C2W[i - 1] : 0)], [L])
+  const C2X = xPos(C2W)
 
   // Section 3 – 3 cols: Descrição | Providência | Realizado
   const C3W = [67, 67, 56] // Σ=190
-  const C3X = C3W.reduce<number[]>((acc, w, i) => [...acc, (acc[i - 1] ?? L) + (i ? C3W[i - 1] : 0)], [L])
+  const C3X = xPos(C3W)
 
   // Footer – 4 cols: Vistoriadores | Aprovado | Concluídos | Termo
   const FW  = [37, 37, 37, 79] // Σ=190
-  const FX  = FW.reduce<number[]>((acc, w, i)  => [...acc, (acc[i - 1] ?? L) + (i ? FW[i - 1] : 0)], [L])
+  const FX  = xPos(FW)
 
   // ── Load logo ────────────────────────────────────────────────────────────────
 

@@ -21,21 +21,7 @@ const EMPTY = {
   projectId: '', techId: '', scheduledDate: '', scheduledTime: '',
   unidade: '', bloco: '', description: '',
   clientName: '', clientPhone: '', complaintChannel: '', initialProvision: '',
-}
-
-async function calcOsNumber(projectId: string, unidade: string, bloco: string): Promise<number> {
-  const { data } = await supabase
-    .from('tickets')
-    .select('os_number')
-    .eq('project_id', projectId)
-    .eq('unidade', unidade.trim())
-    .eq('bloco', bloco.trim() || '')
-    .neq('status', 'concluido')
-
-  if (!data || data.length === 0) return 1
-
-  const max = Math.max(...data.map(t => t.os_number ?? 0))
-  return max + 1
+  osNumber: '',
 }
 
 export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicketModalProps) {
@@ -54,15 +40,18 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    const { projectId, techId, scheduledDate, description, unidade } = form
+    const { projectId, techId, scheduledDate, description, unidade, osNumber } = form
     if (!projectId || !techId || !scheduledDate || !description.trim() || !unidade.trim()) {
       setError('Preencha os campos obrigatorios: Empreendimento, Tecnico, Data, Unidade e Descricao.')
       return
     }
+    const osNum = parseInt(osNumber, 10)
+    if (!osNumber || isNaN(osNum) || osNum < 1) {
+      setError('Informe um Nº da O.S. válido.')
+      return
+    }
     setSubmitting(true)
     setError(null)
-
-    const osNumber = await calcOsNumber(projectId, unidade, form.bloco)
 
     type TicketInsert = Database['public']['Tables']['tickets']['Insert']
     const payload: TicketInsert = {
@@ -78,7 +67,7 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
       client_phone: form.clientPhone.trim() || null,
       complaint_channel: form.complaintChannel || null,
       initial_provision: form.initialProvision.trim() || null,
-      os_number: osNumber,
+      os_number: osNum,
     }
 
     const { data: inserted, error: insertErr } = await supabase
@@ -95,7 +84,7 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
         bloco: form.bloco.trim() || null,
         clientName: form.clientName.trim() || null,
         clientPhone: form.clientPhone.trim() || null,
-        osNumber,
+        osNumber: osNum,
         complaintChannel: form.complaintChannel || null,
         scheduledDate: scheduledDate,
         scheduledTime: form.scheduledTime || null,
@@ -204,6 +193,13 @@ export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicket
               <option value="">Selecione o canal</option>
               {COMPLAINT_CHANNELS.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+          </div>
+
+          {/* Nº da O.S. */}
+          <div>
+            <label className={labelCls}>Nº da O.S. *</label>
+            <input type="number" min={1} value={form.osNumber} onChange={set('osNumber')} disabled={submitting}
+              placeholder="Ex: 1, 42" className={inputCls} />
           </div>
 
           {/* Descrição */}

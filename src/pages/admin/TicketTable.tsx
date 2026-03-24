@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ChevronDown, ChevronRight, Eye, Loader2, Pencil, RefreshCw, Search, Trash2, WifiOff, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Copy, Eye, Loader2, Pencil, RefreshCw, Search, Trash2, WifiOff, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { AdminTicket } from '../../hooks/useAdminTickets'
 import type { TicketStatus } from '../../types/database'
@@ -10,6 +10,7 @@ interface TicketTableProps {
   loading: boolean
   error: string | null
   onVerTicket: (ticket: AdminTicket) => void
+  onDuplicarTicket: (ticket: AdminTicket) => void
   onRefresh: () => void
 }
 
@@ -87,7 +88,7 @@ function applyFilters(
   return result
 }
 
-export default function TicketTable({ tickets, loading, error, onVerTicket, onRefresh }: TicketTableProps) {
+export default function TicketTable({ tickets, loading, error, onVerTicket, onDuplicarTicket, onRefresh }: TicketTableProps) {
   const [filter,          setFilter]          = useState<Filter>('all')
   const [search,          setSearch]          = useState('')
   const [dateFrom,        setDateFrom]        = useState('')
@@ -347,6 +348,11 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onRe
                           ) : (
                             /* ── Normal action buttons ── */
                             <div className="flex items-center justify-center gap-1">
+                              <button onClick={e => { e.stopPropagation(); onDuplicarTicket(ticket) }}
+                                title="Duplicar chamado"
+                                className="p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors">
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
                               <button onClick={e => { e.stopPropagation(); onVerTicket(ticket) }}
                                 title="Ver detalhes"
                                 className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">

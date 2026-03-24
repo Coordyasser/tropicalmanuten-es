@@ -92,10 +92,15 @@ export default function DashboardAdmin() {
   const { profile, signOut } = useAuth()
   const { tickets, loading, error, refetch } = useAdminTickets()
 
-  const [view,           setView]           = useState<View>('overview')
-  const [novoOpen,       setNovoOpen]       = useState(false)
-  const [selectedTicket, setSelectedTicket] = useState<AdminTicket | null>(null)
-  const [sidebarOpen,    setSidebarOpen]    = useState(false)
+  const [view,            setView]            = useState<View>('overview')
+  const [novoOpen,        setNovoOpen]        = useState(false)
+  const [duplicateSource, setDuplicateSource] = useState<AdminTicket | null>(null)
+  const [selectedTicket,  setSelectedTicket]  = useState<AdminTicket | null>(null)
+  const [sidebarOpen,     setSidebarOpen]     = useState(false)
+
+  function openNovo() { setDuplicateSource(null); setNovoOpen(true) }
+  function openDuplicate(ticket: AdminTicket) { setDuplicateSource(ticket); setNovoOpen(true) }
+  function closeNovo() { setNovoOpen(false); setDuplicateSource(null) }
 
   const abertosCount       = tickets.filter(t => t.status === 'aberto').length
   const pendentesCount     = tickets.filter(t => t.status === 'pendente').length
@@ -110,7 +115,7 @@ export default function DashboardAdmin() {
         <Sidebar
           view={view}
           onSetView={setView}
-          onNovoTicket={() => setNovoOpen(true)}
+          onNovoTicket={openNovo}
           onSignOut={signOut}
           userName={profile?.name ?? 'Admin'}
         />
@@ -128,7 +133,7 @@ export default function DashboardAdmin() {
             <Sidebar
               view={view}
               onSetView={setView}
-              onNovoTicket={() => setNovoOpen(true)}
+              onNovoTicket={openNovo}
               onSignOut={signOut}
               userName={profile?.name ?? 'Admin'}
               onClose={() => setSidebarOpen(false)}
@@ -153,7 +158,7 @@ export default function DashboardAdmin() {
             className="h-8 w-8 object-cover rounded-xl"
           />
           <button
-            onClick={() => setNovoOpen(true)}
+            onClick={openNovo}
             className="flex items-center gap-1.5 bg-brand-red hover:bg-brand-red-dark text-white font-semibold px-3 py-2 rounded-xl text-sm transition-colors">
             <Plus className="w-4 h-4" />
             Novo
@@ -176,7 +181,7 @@ export default function DashboardAdmin() {
             </p>
           </div>
           <button
-            onClick={() => setNovoOpen(true)}
+            onClick={openNovo}
             className="flex items-center gap-2 bg-brand-red hover:bg-brand-red-dark text-white font-semibold px-4 py-2.5 rounded-xl shadow-sm shadow-brand-red/20 transition-colors text-sm">
             <Plus className="w-4 h-4" />
             Novo Chamado
@@ -223,6 +228,7 @@ export default function DashboardAdmin() {
               loading={loading}
               error={error}
               onVerTicket={setSelectedTicket}
+              onDuplicarTicket={openDuplicate}
               onRefresh={refetch}
             />
           ) : (
@@ -238,8 +244,9 @@ export default function DashboardAdmin() {
       {/* Modals */}
       <NovoTicketModal
         open={novoOpen}
-        onClose={() => setNovoOpen(false)}
+        onClose={closeNovo}
         onSuccess={refetch}
+        initialData={duplicateSource}
       />
       <TicketDetailModal
         ticket={selectedTicket}

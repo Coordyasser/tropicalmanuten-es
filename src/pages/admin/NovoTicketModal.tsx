@@ -9,10 +9,13 @@ import { categorizeTicket } from '../../lib/categorizeTicket'
 import { generateAndUploadOs } from '../../lib/generateOsPdf'
 import type { OsData } from '../../lib/generateOsPdf'
 
+import type { AdminTicket } from '../../hooks/useAdminTickets'
+
 interface NovoTicketModalProps {
   open: boolean
   onClose: () => void
   onSuccess: () => void
+  initialData?: AdminTicket | null
 }
 
 const COMPLAINT_CHANNELS = ['WhatsApp', 'Telefone', 'E-mail', 'Presencial'] as const
@@ -24,14 +27,35 @@ const EMPTY = {
   osNumber: '',
 }
 
-export default function NovoTicketModal({ open, onClose, onSuccess }: NovoTicketModalProps) {
+export default function NovoTicketModal({ open, onClose, onSuccess, initialData }: NovoTicketModalProps) {
   const { projects, loading: projLoading } = useProjects()
   const { tecnicos, loading: techLoading } = useTecnicos()
   const [form, setForm] = useState(EMPTY)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => { if (!open) { setForm(EMPTY); setError(null) } }, [open])
+  useEffect(() => {
+    if (!open) {
+      setForm(EMPTY)
+      setError(null)
+    } else if (initialData) {
+      setForm({
+        projectId:        initialData.project_id,
+        techId:           initialData.tech_id,
+        scheduledDate:    '',
+        scheduledTime:    '',
+        unidade:          initialData.unidade          ?? '',
+        bloco:            initialData.bloco            ?? '',
+        description:      initialData.description,
+        clientName:       initialData.client_name      ?? '',
+        clientPhone:      initialData.client_phone     ?? '',
+        complaintChannel: initialData.complaint_channel ?? '',
+        initialProvision: initialData.initial_provision ?? '',
+        osNumber:         '',
+      })
+      setError(null)
+    }
+  }, [open])
 
   function set(key: keyof typeof EMPTY) {
     return (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement | HTMLTextAreaElement>) =>

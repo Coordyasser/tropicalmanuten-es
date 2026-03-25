@@ -155,7 +155,7 @@ interface AudioRecorderProps {
   onSaved: (url: string) => void
 }
 
-function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorderProps) {
+export function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorderProps) {
   const [recording,  setRecording]  = useState(false)
   const [uploading,  setUploading]  = useState(false)
   const [error,      setError]      = useState<string | null>(null)

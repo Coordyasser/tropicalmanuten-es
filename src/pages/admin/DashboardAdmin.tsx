@@ -6,6 +6,7 @@ import type { AdminTicket } from '../../hooks/useAdminTickets'
 import TicketTable from './TicketTable'
 import NovoTicketModal from './NovoTicketModal'
 import TicketDetailModal from './TicketDetailModal'
+import AtenderTicketModal from './AtenderTicketModal'
 import CalendarioAdmin from './CalendarioAdmin'
 
 type View = 'overview' | 'calendario'
@@ -96,6 +97,7 @@ export default function DashboardAdmin() {
   const [novoOpen,        setNovoOpen]        = useState(false)
   const [duplicateSource, setDuplicateSource] = useState<AdminTicket | null>(null)
   const [selectedTicket,  setSelectedTicket]  = useState<AdminTicket | null>(null)
+  const [atenderTicket,   setAtenderTicket]   = useState<AdminTicket | null>(null)
   const [sidebarOpen,     setSidebarOpen]     = useState(false)
 
   function openNovo() { setDuplicateSource(null); setNovoOpen(true) }
@@ -229,6 +231,7 @@ export default function DashboardAdmin() {
               error={error}
               onVerTicket={setSelectedTicket}
               onDuplicarTicket={openDuplicate}
+              onAtenderTicket={setAtenderTicket}
               onRefresh={refetch}
             />
           ) : (
@@ -251,6 +254,11 @@ export default function DashboardAdmin() {
       <TicketDetailModal
         ticket={selectedTicket}
         onClose={() => setSelectedTicket(null)}
+      />
+      <AtenderTicketModal
+        ticket={atenderTicket}
+        onClose={() => setAtenderTicket(null)}
+        onSuccess={() => { setAtenderTicket(null); refetch() }}
       />
     </div>
   )

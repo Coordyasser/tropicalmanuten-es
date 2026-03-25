@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import {
   Camera, CheckCircle2, Clock, FileDown, Image,
-  Loader2, MapPin, MicOff, Timer, X,
+  Loader2, MapPin, Timer, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import SignatureCanvas from '../../components/SignatureCanvas'
@@ -66,7 +66,7 @@ function StatusSelector({ value, onChange }: { value: TicketStatus; onChange: (s
 
 // ── Main component ────────────────────────────────────────────────────────────
 interface AtenderTicketModalProps {
-  ticket: AdminTicket | null
+  ticket: AdminTicket
   onClose: () => void
   onSuccess: () => void
 }
@@ -77,7 +77,7 @@ export default function AtenderTicketModal({ ticket, onClose, onSuccess }: Atend
   const galleryInputRef = useRef<HTMLInputElement>(null)
 
   const initialStatus: TicketStatus =
-    ticket?.status === 'aberto' ? 'concluido' : (ticket?.status ?? 'concluido') as TicketStatus
+    ticket.status === 'aberto' ? 'concluido' : ticket.status
 
   const [form, setForm] = useState<TicketForm>({
     status:       initialStatus,
@@ -85,12 +85,10 @@ export default function AtenderTicketModal({ ticket, onClose, onSuccess }: Atend
     photoFile:    null,
     photoPreview: null,
   })
-  const [localAudioUrl,    setLocalAudioUrl]    = useState(ticket?.audio_url ?? null)
-  const [localResAudioUrl, setLocalResAudioUrl] = useState(ticket?.resolution_audio_url ?? null)
+  const [localAudioUrl,    setLocalAudioUrl]    = useState(ticket.audio_url ?? null)
+  const [localResAudioUrl, setLocalResAudioUrl] = useState(ticket.resolution_audio_url ?? null)
   const [submitting,  setSubmitting]  = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-
-  if (!ticket) return null
 
   const isConcluido  = ticket.status === 'concluido'
   const isPendente   = ticket.status === 'pendente'

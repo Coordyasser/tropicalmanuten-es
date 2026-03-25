@@ -255,11 +255,13 @@ export default function DashboardAdmin() {
         ticket={selectedTicket}
         onClose={() => setSelectedTicket(null)}
       />
-      <AtenderTicketModal
-        ticket={atenderTicket}
-        onClose={() => setAtenderTicket(null)}
-        onSuccess={() => { setAtenderTicket(null); refetch() }}
-      />
+      {atenderTicket && (
+        <AtenderTicketModal
+          ticket={atenderTicket}
+          onClose={() => setAtenderTicket(null)}
+          onSuccess={() => { setAtenderTicket(null); refetch() }}
+        />
+      )}
     </div>
   )
 }

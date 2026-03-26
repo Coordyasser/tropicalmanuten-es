@@ -89,8 +89,6 @@ export default function AtenderTicketModal({ ticket, onClose, onSuccess }: Atend
   const [localResAudioUrl,     setLocalResAudioUrl]     = useState(ticket.resolution_audio_url ?? null)
   const [localAudioTranscript, setLocalAudioTranscript] = useState<string | null>(ticket.audio_transcription ?? null)
   const [localResTranscript,   setLocalResTranscript]   = useState<string | null>(ticket.resolution_audio_transcription ?? null)
-  const [transcribingAudio,    setTranscribingAudio]    = useState(false)
-  const [transcribingResAudio, setTranscribingResAudio] = useState(false)
   const [submitting,  setSubmitting]  = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -296,15 +294,7 @@ export default function AtenderTicketModal({ ticket, onClose, onSuccess }: Atend
                       ticketId={ticket.id}
                       targetColumn="audio_url"
                       onSaved={url => setLocalAudioUrl(url)}
-                      transcriptionColumn="audio_transcription"
-                      onTranscribing={setTranscribingAudio}
-                      onTranscriptionDone={text => setLocalAudioTranscript(text)}
                     />
-                  )}
-                  {transcribingAudio && (
-                    <p className="flex items-center gap-1.5 text-xs text-blue-500 mt-1.5">
-                      <Loader2 className="w-3 h-3 animate-spin" /> Transcrevendo áudio...
-                    </p>
                   )}
                   {localAudioTranscript && (
                     <div className="mt-2">
@@ -321,15 +311,7 @@ export default function AtenderTicketModal({ ticket, onClose, onSuccess }: Atend
                           ticketId={ticket.id}
                           targetColumn="resolution_audio_url"
                           onSaved={url => setLocalResAudioUrl(url)}
-                          transcriptionColumn="resolution_audio_transcription"
-                          onTranscribing={setTranscribingResAudio}
-                          onTranscriptionDone={text => setLocalResTranscript(text)}
                         />
-                      )}
-                      {transcribingResAudio && (
-                        <p className="flex items-center gap-1.5 text-xs text-blue-500 mt-1.5">
-                          <Loader2 className="w-3 h-3 animate-spin" /> Transcrevendo áudio...
-                        </p>
                       )}
                       {localResTranscript && (
                         <div className="mt-2">

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X, CalendarDays, ExternalLink, Loader2, MapPin, User, FileText, Camera, PenLine, Tag, Clock, Volume2, FileDown, Phone, MessageSquare, Hash } from 'lucide-react'
 import type { AdminTicket } from '../../hooks/useAdminTickets'
 import { transcribeAudio } from '../../lib/transcribeAudio'
+import { generateTicketReport } from '../../lib/generateReportPdf'
 import { supabase } from '../../lib/supabase'
 
 interface TicketDetailModalProps {
@@ -114,7 +115,19 @@ function AudioWithTranscription({
 }
 
 export default function TicketDetailModal({ ticket, onClose }: TicketDetailModalProps) {
+  const [generatingPdf, setGeneratingPdf] = useState(false)
+
   if (!ticket) return null
+
+  async function handleDownloadReport() {
+    if (!ticket) return
+    setGeneratingPdf(true)
+    try {
+      await generateTicketReport(ticket)
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
@@ -309,17 +322,29 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
           )}
         </div>
 
-        <div className="px-6 pb-6 flex gap-3">
-          {ticket.os_pdf_url && (
-            <a href={ticket.os_pdf_url} target="_blank" rel="noopener noreferrer"
-              className="flex-1 py-2.5 rounded-xl bg-brand-red hover:bg-brand-red-dark text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2">
-              <FileDown className="w-4 h-4" />
-              Ver O.S.
-            </a>
-          )}
-          <button onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm font-medium">
-            Fechar
+        <div className="px-6 pb-6 flex flex-col gap-2">
+          <div className="flex gap-3">
+            {ticket.os_pdf_url && (
+              <a href={ticket.os_pdf_url} target="_blank" rel="noopener noreferrer"
+                className="flex-1 py-2.5 rounded-xl bg-brand-red hover:bg-brand-red-dark text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2">
+                <FileDown className="w-4 h-4" />
+                Ver O.S.
+              </a>
+            )}
+            <button onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm font-medium">
+              Fechar
+            </button>
+          </div>
+          <button
+            onClick={handleDownloadReport}
+            disabled={generatingPdf}
+            className="w-full py-2.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {generatingPdf
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Gerando PDF...</>
+              : <><FileDown className="w-4 h-4" /> Baixar Relatório (PDF)</>
+            }
           </button>
         </div>
       </div>

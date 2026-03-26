@@ -6,7 +6,6 @@ import {
   FileDown, Image, Loader2, Lock, MapPin, Mic, MicOff, Paperclip, Timer, Trash2, Volume2, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { transcribeAudio } from '../../lib/transcribeAudio'
 import SignatureCanvas from '../../components/SignatureCanvas'
 import type { SignatureCanvasHandle } from '../../components/SignatureCanvas'
 import type { TicketWithRelations } from '../../hooks/useTickets'
@@ -154,12 +153,9 @@ interface AudioRecorderProps {
   ticketId: string
   targetColumn: 'audio_url' | 'resolution_audio_url'
   onSaved: (url: string) => void
-  transcriptionColumn?: 'audio_transcription' | 'resolution_audio_transcription'
-  onTranscribing?: (v: boolean) => void
-  onTranscriptionDone?: (text: string) => void
 }
 
-export function AudioRecorder({ ticketId, targetColumn, onSaved, transcriptionColumn, onTranscribing, onTranscriptionDone }: AudioRecorderProps) {
+export function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorderProps) {
   const [recording,  setRecording]  = useState(false)
   const [uploading,  setUploading]  = useState(false)
   const [error,      setError]      = useState<string | null>(null)
@@ -204,20 +200,6 @@ export function AudioRecorder({ ticketId, targetColumn, onSaved, transcriptionCo
     await supabase.from('tickets').update({ [targetColumn]: url }).eq('id', ticketId)
     onSaved(url)
     setUploading(false)
-
-    // Transcrição em segundo plano (não bloqueia o usuário)
-    if (transcriptionColumn && onTranscribing && onTranscriptionDone) {
-      onTranscribing(true)
-      transcribeAudio(data_blob, mimeType)
-        .then(text => {
-          onTranscribing!(false)
-          if (text) {
-            supabase.from('tickets').update({ [transcriptionColumn]: text }).eq('id', ticketId).then()
-            onTranscriptionDone!(text)
-          }
-        })
-        .catch(() => onTranscribing!(false))
-    }
   }
 
   async function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
@@ -296,8 +278,6 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
   const [localResAudioUrl,      setLocalResAudioUrl]      = useState(ticket.resolution_audio_url)
   const [localAudioTranscript,  setLocalAudioTranscript]  = useState<string | null>(ticket.audio_transcription ?? null)
   const [localResTranscript,    setLocalResTranscript]    = useState<string | null>(ticket.resolution_audio_transcription ?? null)
-  const [transcribingAudio,     setTranscribingAudio]     = useState(false)
-  const [transcribingResAudio,  setTranscribingResAudio]  = useState(false)
   const [deletingAudio,         setDeletingAudio]         = useState<'audio_url' | 'resolution_audio_url' | null>(null)
 
   async function handleDeleteAudio(column: 'audio_url' | 'resolution_audio_url', url: string) {
@@ -484,15 +464,7 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
             ticketId={ticket.id}
             targetColumn="audio_url"
             onSaved={url => setLocalAudioUrl(url)}
-            transcriptionColumn="audio_transcription"
-            onTranscribing={setTranscribingAudio}
-            onTranscriptionDone={text => setLocalAudioTranscript(text)}
           />
-        )}
-        {transcribingAudio && (
-          <p className="flex items-center gap-1.5 text-xs text-blue-500 mt-1.5">
-            <Loader2 className="w-3 h-3 animate-spin" /> Transcrevendo áudio...
-          </p>
         )}
         {localAudioTranscript && (
           <div className="mt-2">
@@ -514,15 +486,7 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
                 ticketId={ticket.id}
                 targetColumn="resolution_audio_url"
                 onSaved={url => setLocalResAudioUrl(url)}
-                transcriptionColumn="resolution_audio_transcription"
-                onTranscribing={setTranscribingResAudio}
-                onTranscriptionDone={text => setLocalResTranscript(text)}
               />
-            )}
-            {transcribingResAudio && (
-              <p className="flex items-center gap-1.5 text-xs text-blue-500 mt-1.5">
-                <Loader2 className="w-3 h-3 animate-spin" /> Transcrevendo áudio...
-              </p>
             )}
             {localResTranscript && (
               <div className="mt-2">

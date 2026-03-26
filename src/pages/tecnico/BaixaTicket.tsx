@@ -6,6 +6,7 @@ import {
   FileDown, Image, Loader2, Lock, MapPin, Mic, MicOff, Paperclip, Timer, Trash2, Volume2, X,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { transcribeAudio } from '../../lib/transcribeAudio'
 import SignatureCanvas from '../../components/SignatureCanvas'
 import type { SignatureCanvasHandle } from '../../components/SignatureCanvas'
 import type { TicketWithRelations } from '../../hooks/useTickets'
@@ -153,9 +154,12 @@ interface AudioRecorderProps {
   ticketId: string
   targetColumn: 'audio_url' | 'resolution_audio_url'
   onSaved: (url: string) => void
+  transcriptionColumn?: 'audio_transcription' | 'resolution_audio_transcription'
+  onTranscribing?: (v: boolean) => void
+  onTranscriptionDone?: (text: string) => void
 }
 
-export function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorderProps) {
+export function AudioRecorder({ ticketId, targetColumn, onSaved, transcriptionColumn, onTranscribing, onTranscriptionDone }: AudioRecorderProps) {
   const [recording,  setRecording]  = useState(false)
   const [uploading,  setUploading]  = useState(false)
   const [error,      setError]      = useState<string | null>(null)
@@ -200,6 +204,20 @@ export function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorder
     await supabase.from('tickets').update({ [targetColumn]: url }).eq('id', ticketId)
     onSaved(url)
     setUploading(false)
+
+    // Transcrição em segundo plano (não bloqueia o usuário)
+    if (transcriptionColumn && onTranscribing && onTranscriptionDone) {
+      onTranscribing(true)
+      transcribeAudio(data_blob, mimeType)
+        .then(text => {
+          onTranscribing!(false)
+          if (text) {
+            supabase.from('tickets').update({ [transcriptionColumn]: text }).eq('id', ticketId).then()
+            onTranscriptionDone!(text)
+          }
+        })
+        .catch(() => onTranscribing!(false))
+    }
   }
 
   async function handleFileSelect(e: ChangeEvent<HTMLInputElement>) {
@@ -274,9 +292,13 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
   const isPendente    = ticket.status === 'pendente'
 
   // Local audio state — initialised from DB, cleared on delete, set on new upload
-  const [localAudioUrl,    setLocalAudioUrl]    = useState(ticket.audio_url)
-  const [localResAudioUrl, setLocalResAudioUrl] = useState(ticket.resolution_audio_url)
-  const [deletingAudio,    setDeletingAudio]    = useState<'audio_url' | 'resolution_audio_url' | null>(null)
+  const [localAudioUrl,         setLocalAudioUrl]         = useState(ticket.audio_url)
+  const [localResAudioUrl,      setLocalResAudioUrl]      = useState(ticket.resolution_audio_url)
+  const [localAudioTranscript,  setLocalAudioTranscript]  = useState<string | null>(ticket.audio_transcription ?? null)
+  const [localResTranscript,    setLocalResTranscript]    = useState<string | null>(ticket.resolution_audio_transcription ?? null)
+  const [transcribingAudio,     setTranscribingAudio]     = useState(false)
+  const [transcribingResAudio,  setTranscribingResAudio]  = useState(false)
+  const [deletingAudio,         setDeletingAudio]         = useState<'audio_url' | 'resolution_audio_url' | null>(null)
 
   async function handleDeleteAudio(column: 'audio_url' | 'resolution_audio_url', url: string) {
     setDeletingAudio(column)
@@ -458,7 +480,25 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
             onDelete={deletingAudio === 'audio_url' ? undefined : () => handleDeleteAudio('audio_url', localAudioUrl)}
           />
         ) : form.status === 'pendente' && (
-          <AudioRecorder ticketId={ticket.id} targetColumn="audio_url" onSaved={url => setLocalAudioUrl(url)} />
+          <AudioRecorder
+            ticketId={ticket.id}
+            targetColumn="audio_url"
+            onSaved={url => setLocalAudioUrl(url)}
+            transcriptionColumn="audio_transcription"
+            onTranscribing={setTranscribingAudio}
+            onTranscriptionDone={text => setLocalAudioTranscript(text)}
+          />
+        )}
+        {transcribingAudio && (
+          <p className="flex items-center gap-1.5 text-xs text-blue-500 mt-1.5">
+            <Loader2 className="w-3 h-3 animate-spin" /> Transcrevendo áudio...
+          </p>
+        )}
+        {localAudioTranscript && (
+          <div className="mt-2">
+            <p className="text-xs font-semibold text-slate-500 mb-1">Transcrição do Áudio</p>
+            <pre className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed bg-blue-50 border border-blue-100 rounded-xl p-3">{localAudioTranscript}</pre>
+          </div>
         )}
 
         {/* Áudio de resolução — apenas ao concluir */}
@@ -470,7 +510,25 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
                 onDelete={deletingAudio === 'resolution_audio_url' ? undefined : () => handleDeleteAudio('resolution_audio_url', localResAudioUrl)}
               />
             ) : (
-              <AudioRecorder ticketId={ticket.id} targetColumn="resolution_audio_url" onSaved={url => setLocalResAudioUrl(url)} />
+              <AudioRecorder
+                ticketId={ticket.id}
+                targetColumn="resolution_audio_url"
+                onSaved={url => setLocalResAudioUrl(url)}
+                transcriptionColumn="resolution_audio_transcription"
+                onTranscribing={setTranscribingResAudio}
+                onTranscriptionDone={text => setLocalResTranscript(text)}
+              />
+            )}
+            {transcribingResAudio && (
+              <p className="flex items-center gap-1.5 text-xs text-blue-500 mt-1.5">
+                <Loader2 className="w-3 h-3 animate-spin" /> Transcrevendo áudio...
+              </p>
+            )}
+            {localResTranscript && (
+              <div className="mt-2">
+                <p className="text-xs font-semibold text-slate-500 mb-1">Transcrição do Áudio de Resolução</p>
+                <pre className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed bg-blue-50 border border-blue-100 rounded-xl p-3">{localResTranscript}</pre>
+              </div>
             )}
           </div>
         )}

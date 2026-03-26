@@ -38,8 +38,10 @@ export interface Database {
           photo_url: string | null
           signature_url: string | null
           audio_url: string | null
+          audio_transcription: string | null
           resolution_notes: string | null
           resolution_audio_url: string | null
+          resolution_audio_transcription: string | null
           completed_at: string | null
           duration: string | null
           client_name: string | null
@@ -64,8 +66,10 @@ export interface Database {
           photo_url?: string | null
           signature_url?: string | null
           audio_url?: string | null
+          audio_transcription?: string | null
           resolution_notes?: string | null
           resolution_audio_url?: string | null
+          resolution_audio_transcription?: string | null
           completed_at?: string | null
           duration?: string | null
           client_name?: string | null
@@ -90,8 +94,10 @@ export interface Database {
           photo_url?: string | null
           signature_url?: string | null
           audio_url?: string | null
+          audio_transcription?: string | null
           resolution_notes?: string | null
           resolution_audio_url?: string | null
+          resolution_audio_transcription?: string | null
           completed_at?: string | null
           duration?: string | null
           client_name?: string | null

@@ -17,8 +17,10 @@ export interface AdminTicket {
   photo_url: string | null
   signature_url: string | null
   audio_url: string | null
+  audio_transcription: string | null
   resolution_notes: string | null
   resolution_audio_url: string | null
+  resolution_audio_transcription: string | null
   client_name: string | null
   client_phone: string | null
   complaint_channel: string | null
@@ -49,8 +51,8 @@ export function useAdminTickets(): UseAdminTicketsResult {
       .select(`
         id, project_id, tech_id, scheduled_date, scheduled_time,
         description, unidade, bloco, categoria,
-        status, report, photo_url, signature_url, audio_url,
-        resolution_notes, resolution_audio_url,
+        status, report, photo_url, signature_url, audio_url, audio_transcription,
+        resolution_notes, resolution_audio_url, resolution_audio_transcription,
         client_name, client_phone, complaint_channel, initial_provision,
         os_number, os_pdf_url,
         project:projects ( name ),

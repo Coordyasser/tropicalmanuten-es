@@ -85,8 +85,12 @@ export default function AtenderTicketModal({ ticket, onClose, onSuccess }: Atend
     photoFile:    null,
     photoPreview: null,
   })
-  const [localAudioUrl,    setLocalAudioUrl]    = useState(ticket.audio_url ?? null)
-  const [localResAudioUrl, setLocalResAudioUrl] = useState(ticket.resolution_audio_url ?? null)
+  const [localAudioUrl,        setLocalAudioUrl]        = useState(ticket.audio_url ?? null)
+  const [localResAudioUrl,     setLocalResAudioUrl]     = useState(ticket.resolution_audio_url ?? null)
+  const [localAudioTranscript, setLocalAudioTranscript] = useState<string | null>(ticket.audio_transcription ?? null)
+  const [localResTranscript,   setLocalResTranscript]   = useState<string | null>(ticket.resolution_audio_transcription ?? null)
+  const [transcribingAudio,    setTranscribingAudio]    = useState(false)
+  const [transcribingResAudio, setTranscribingResAudio] = useState(false)
   const [submitting,  setSubmitting]  = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -288,14 +292,50 @@ export default function AtenderTicketModal({ ticket, onClose, onSuccess }: Atend
                   {localAudioUrl ? (
                     <AudioPlayer url={localAudioUrl} />
                   ) : form.status === 'pendente' && (
-                    <AudioRecorder ticketId={ticket.id} targetColumn="audio_url" onSaved={url => setLocalAudioUrl(url)} />
+                    <AudioRecorder
+                      ticketId={ticket.id}
+                      targetColumn="audio_url"
+                      onSaved={url => setLocalAudioUrl(url)}
+                      transcriptionColumn="audio_transcription"
+                      onTranscribing={setTranscribingAudio}
+                      onTranscriptionDone={text => setLocalAudioTranscript(text)}
+                    />
+                  )}
+                  {transcribingAudio && (
+                    <p className="flex items-center gap-1.5 text-xs text-blue-500 mt-1.5">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Transcrevendo áudio...
+                    </p>
+                  )}
+                  {localAudioTranscript && (
+                    <div className="mt-2">
+                      <p className="text-xs font-semibold text-slate-500 mb-1">Transcrição do Áudio</p>
+                      <pre className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed bg-blue-50 border border-blue-100 rounded-xl p-3">{localAudioTranscript}</pre>
+                    </div>
                   )}
                   {form.status === 'concluido' && (
                     <div className={localAudioUrl ? 'mt-2' : ''}>
                       {localResAudioUrl ? (
                         <AudioPlayer url={localResAudioUrl} />
                       ) : (
-                        <AudioRecorder ticketId={ticket.id} targetColumn="resolution_audio_url" onSaved={url => setLocalResAudioUrl(url)} />
+                        <AudioRecorder
+                          ticketId={ticket.id}
+                          targetColumn="resolution_audio_url"
+                          onSaved={url => setLocalResAudioUrl(url)}
+                          transcriptionColumn="resolution_audio_transcription"
+                          onTranscribing={setTranscribingResAudio}
+                          onTranscriptionDone={text => setLocalResTranscript(text)}
+                        />
+                      )}
+                      {transcribingResAudio && (
+                        <p className="flex items-center gap-1.5 text-xs text-blue-500 mt-1.5">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Transcrevendo áudio...
+                        </p>
+                      )}
+                      {localResTranscript && (
+                        <div className="mt-2">
+                          <p className="text-xs font-semibold text-slate-500 mb-1">Transcrição do Áudio de Resolução</p>
+                          <pre className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed bg-blue-50 border border-blue-100 rounded-xl p-3">{localResTranscript}</pre>
+                        </div>
                       )}
                     </div>
                   )}

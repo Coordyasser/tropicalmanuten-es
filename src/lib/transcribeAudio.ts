@@ -29,10 +29,17 @@ export async function transcribeAudio(blob: Blob, mimeType: string): Promise<str
       },
     )
 
-    if (!res.ok) return null
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '')
+      console.error('[Gemini] Erro na transcrição:', res.status, errBody)
+      return null
+    }
     const data = await res.json()
-    return (data.candidates?.[0]?.content?.parts?.[0]?.text as string | undefined)?.trim() ?? null
-  } catch {
+    const text = (data.candidates?.[0]?.content?.parts?.[0]?.text as string | undefined)?.trim() ?? null
+    if (!text) console.warn('[Gemini] Resposta vazia:', JSON.stringify(data))
+    return text
+  } catch (e) {
+    console.error('[Gemini] Exceção na transcrição:', e)
     return null
   }
 }

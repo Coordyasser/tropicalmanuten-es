@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { X, CalendarDays, ExternalLink, MapPin, User, FileText, Camera, PenLine, Tag, Clock, Volume2, FileDown, Phone, MessageSquare, Hash } from 'lucide-react'
+import { X, CalendarDays, ExternalLink, Loader2, MapPin, User, FileText, Camera, PenLine, Tag, Clock, Volume2, FileDown, Phone, MessageSquare, Hash } from 'lucide-react'
 import type { AdminTicket } from '../../hooks/useAdminTickets'
+import { transcribeAudio } from '../../lib/transcribeAudio'
+import { supabase } from '../../lib/supabase'
 
 interface TicketDetailModalProps {
   ticket: AdminTicket | null
@@ -54,6 +56,58 @@ function PhotoPreview({ url }: { url: string }) {
           <img src={url} alt="Foto do chamado" onError={() => setError(true)}
             className="w-full rounded-xl border border-slate-200 object-cover max-h-72 hover:opacity-90 transition-opacity cursor-zoom-in" />
         </a>
+      )}
+    </div>
+  )
+}
+
+function AudioWithTranscription({
+  url,
+  initialTranscription,
+  ticketId,
+  column,
+}: {
+  url: string
+  initialTranscription: string | null
+  ticketId: string
+  column: 'audio_transcription' | 'resolution_audio_transcription'
+}) {
+  const [transcription, setTranscription] = useState<string | null>(initialTranscription)
+  const [transcribing, setTranscribing]   = useState(false)
+
+  async function handleTranscribe() {
+    setTranscribing(true)
+    try {
+      const res  = await fetch(url)
+      const blob = await res.blob()
+      const text = await transcribeAudio(blob, blob.type || 'audio/webm')
+      if (text) {
+        setTranscription(text)
+        supabase.from('tickets').update({ [column]: text }).eq('id', ticketId).then()
+      }
+    } finally {
+      setTranscribing(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
+        <Volume2 className="w-4 h-4 text-blue-500 shrink-0" />
+        <audio controls src={url} className="flex-1 h-8 min-w-0" />
+      </div>
+      {transcription ? (
+        <div>
+          <p className="text-xs font-semibold text-slate-500 mb-1">Transcrição do Áudio</p>
+          <pre className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed bg-blue-50 border border-blue-100 rounded-xl p-3">{transcription}</pre>
+        </div>
+      ) : (
+        <button onClick={handleTranscribe} disabled={transcribing}
+          className="flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-700 disabled:opacity-60 transition-colors">
+          {transcribing
+            ? <><Loader2 className="w-3 h-3 animate-spin" /> Transcrevendo...</>
+            : '✦ Transcrever áudio'}
+        </button>
       )}
     </div>
   )
@@ -233,18 +287,22 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
                 <Volume2 className="w-4 h-4 text-slate-400" />
                 <span className="text-sm font-semibold text-slate-600">Audio</span>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {ticket.audio_url && (
-                  <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
-                    <Volume2 className="w-4 h-4 text-blue-500 shrink-0" />
-                    <audio controls src={ticket.audio_url} className="flex-1 h-8 min-w-0" />
-                  </div>
+                  <AudioWithTranscription
+                    url={ticket.audio_url}
+                    initialTranscription={ticket.audio_transcription ?? null}
+                    ticketId={ticket.id}
+                    column="audio_transcription"
+                  />
                 )}
                 {ticket.resolution_audio_url && (
-                  <div className="flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
-                    <Volume2 className="w-4 h-4 text-blue-500 shrink-0" />
-                    <audio controls src={ticket.resolution_audio_url} className="flex-1 h-8 min-w-0" />
-                  </div>
+                  <AudioWithTranscription
+                    url={ticket.resolution_audio_url}
+                    initialTranscription={ticket.resolution_audio_transcription ?? null}
+                    ticketId={ticket.id}
+                    column="resolution_audio_transcription"
+                  />
                 )}
               </div>
             </div>

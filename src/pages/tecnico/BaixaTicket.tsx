@@ -582,7 +582,12 @@ export default function BaixaTicket() {
     const startAt      = parseScheduledAt(editableTicket.scheduled_date, editableTicket.scheduled_time)
 
     const olderPending = tickets
-      .filter(t => t.status !== 'concluido' && t.id !== editableId)
+      .filter(t =>
+        t.status !== 'concluido' &&
+        t.id !== editableId &&
+        editableTicket.os_number !== null &&
+        t.os_number === editableTicket.os_number
+      )
       .sort((a, b) => {
         const aKey = a.scheduled_date + (a.scheduled_time ?? '')
         const bKey = b.scheduled_date + (b.scheduled_time ?? '')

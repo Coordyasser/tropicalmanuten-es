@@ -37,8 +37,9 @@ function mimeFromDataUrl(dataUrl: string): string {
 
 export async function generateTicketReport(ticket: AdminTicket): Promise<void> {
   // Pre-fetch images in parallel
-  const [logo, photoData, signatureData] = await Promise.all([
+  const [logo, diagPhotoData, photoData, signatureData] = await Promise.all([
     logoAsBase64(),
+    ticket.diagnostic_photo_url ? fetchBase64(ticket.diagnostic_photo_url) : Promise.resolve(null),
     ticket.photo_url     ? fetchBase64(ticket.photo_url)     : Promise.resolve(null),
     ticket.signature_url ? fetchBase64(ticket.signature_url) : Promise.resolve(null),
   ])
@@ -181,14 +182,14 @@ export async function generateTicketReport(ticket: AdminTicket): Promise<void> {
   sectionHeader('DIAGNÓSTICO')
   textBox('Observações do técnico', ticket.report)
   textBox('Transcrição do áudio de diagnóstico', ticket.audio_transcription)
-  if (!ticket.resolution_notes && photoData) addImage(photoData, 'Foto do diagnóstico')
+  if (diagPhotoData) addImage(diagPhotoData, 'Foto do diagnóstico')
 
   // ── CONCLUSÃO ────────────────────────────────────────────────────────────
   if (ticket.status === 'concluido' || ticket.resolution_notes) {
     sectionHeader('CONCLUSÃO')
     textBox('Relatório final', ticket.resolution_notes)
     textBox('Transcrição do áudio de conclusão', ticket.resolution_audio_transcription)
-    if (ticket.resolution_notes && photoData) addImage(photoData, 'Foto da conclusão')
+    if (photoData) addImage(photoData, 'Foto da conclusão')
     if (signatureData) addImage(signatureData, 'Assinatura do cliente')
   }
 

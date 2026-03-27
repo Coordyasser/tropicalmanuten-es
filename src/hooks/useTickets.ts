@@ -16,6 +16,7 @@ export interface TicketWithRelations {
   status: TicketStatus
   report: string | null
   photo_url: string | null
+  diagnostic_photo_url: string | null
   signature_url: string | null
   audio_url: string | null
   audio_transcription: string | null
@@ -50,7 +51,7 @@ export function useTickets(): UseTicketsResult {
       .select(`
         id, project_id, tech_id, scheduled_date, scheduled_time,
         description, unidade, bloco, categoria, status,
-        report, photo_url, signature_url, audio_url, audio_transcription,
+        report, photo_url, diagnostic_photo_url, signature_url, audio_url, audio_transcription,
         resolution_notes, resolution_audio_url, resolution_audio_transcription,
         os_number, os_pdf_url, completed_at,
         project:projects ( name )

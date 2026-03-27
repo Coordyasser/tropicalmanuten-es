@@ -19,6 +19,8 @@ interface TicketForm {
   changed: boolean
   photoFile: File | null
   photoPreview: string | null
+  diagnosticPhotoFile: File | null
+  diagnosticPhotoPreview: string | null
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -268,8 +270,10 @@ interface TicketItemProps {
 }
 
 function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketItemProps) {
-  const cameraInputRef  = useRef<HTMLInputElement>(null)
-  const galleryInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef      = useRef<HTMLInputElement>(null)
+  const galleryInputRef     = useRef<HTMLInputElement>(null)
+  const diagCameraInputRef  = useRef<HTMLInputElement>(null)
+  const diagGalleryInputRef = useRef<HTMLInputElement>(null)
   const isConcluido     = ticket.status === 'concluido'
   const isPendente    = ticket.status === 'pendente'
 
@@ -297,6 +301,16 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
     onChange({ photoFile: null, photoPreview: null })
     if (cameraInputRef.current)  cameraInputRef.current.value  = ''
     if (galleryInputRef.current) galleryInputRef.current.value = ''
+  }
+  function handleDiagPhotoChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    onChange({ diagnosticPhotoFile: file, diagnosticPhotoPreview: URL.createObjectURL(file), changed: true })
+  }
+  function removeDiagPhoto() {
+    onChange({ diagnosticPhotoFile: null, diagnosticPhotoPreview: null })
+    if (diagCameraInputRef.current)  diagCameraInputRef.current.value  = ''
+    if (diagGalleryInputRef.current) diagGalleryInputRef.current.value = ''
   }
 
   // ── Read-only: already concluded ──────────────────────────────────────────
@@ -498,6 +512,38 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
         )}
       </div>
 
+      {/* Foto do Diagnóstico — apenas quando Pendente */}
+      {form.status === 'pendente' && (
+        <div className="px-4 pb-3">
+          <p className="text-xs font-semibold text-slate-600 mb-2">
+            Foto do Diagnóstico <span className="font-normal text-slate-400">(opcional)</span>
+          </p>
+          <input ref={diagCameraInputRef}  type="file" accept="image/*" capture="environment" className="hidden" onChange={handleDiagPhotoChange} />
+          <input ref={diagGalleryInputRef} type="file" accept="image/*" className="hidden" onChange={handleDiagPhotoChange} />
+          {form.diagnosticPhotoPreview ? (
+            <div className="relative rounded-xl overflow-hidden border border-slate-200">
+              <img src={form.diagnosticPhotoPreview} alt="Foto diagnóstico" className="w-full h-40 object-cover" />
+              <button type="button" onClick={removeDiagPhoto}
+                className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1.5 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button type="button" onClick={() => diagCameraInputRef.current?.click()}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition-all active:scale-[0.98]">
+                <Camera className="w-4 h-4" /> Tirar Foto
+              </button>
+              <button type="button" onClick={() => diagGalleryInputRef.current?.click()}
+                title="Anexar foto da galeria"
+                className="flex items-center justify-center px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 transition-all active:scale-[0.98]">
+                <Image className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Foto + Assinatura — apenas quando Concluido */}
       {form.status === 'concluido' && (
         <>
@@ -556,7 +602,7 @@ export default function BaixaTicket() {
     const m = new Map<string, TicketForm>()
     for (const t of state?.tickets ?? []) {
       const initial: TicketStatus = t.status === 'aberto' ? 'concluido' : t.status
-      m.set(t.id, { status: initial, observacao: '', changed: false, photoFile: null, photoPreview: null })
+      m.set(t.id, { status: initial, observacao: '', changed: false, photoFile: null, photoPreview: null, diagnosticPhotoFile: null, diagnosticPhotoPreview: null })
     }
     return m
   })
@@ -618,6 +664,18 @@ export default function BaixaTicket() {
 
     const isOldestInGroup = olderPending.length === 0
 
+    // ── Diagnostic photo upload ───────────────────────────────────────────
+    let diagnosticPhotoUrl: string | null = editableTicket.diagnostic_photo_url
+    if (!isConcluding && form.diagnosticPhotoFile) {
+      const ext  = (form.diagnosticPhotoFile.name.split('.').pop() ?? 'jpg').split('?')[0]
+      const path = `tickets/${editableTicket.id}/diagnostic_photo.${ext}`
+      const { data: upd, error: upe } = await supabase.storage
+        .from('photos')
+        .upload(path, form.diagnosticPhotoFile, { upsert: true, contentType: form.diagnosticPhotoFile.type || 'image/jpeg' })
+      if (upe) { setSubmitError(`Erro ao enviar foto: ${upe.message}`); setSubmitting(false); return }
+      if (upd) { diagnosticPhotoUrl = supabase.storage.from('photos').getPublicUrl(upd.path).data.publicUrl }
+    }
+
     // ── Photo upload ──────────────────────────────────────────────────────
     let photoUrl: string | null = editableTicket.photo_url
     if (isConcluding && form.photoFile) {
@@ -656,14 +714,15 @@ export default function BaixaTicket() {
 
     // ── Save editable ticket ──────────────────────────────────────────────
     const updatePayload: Database['public']['Tables']['tickets']['Update'] = {
-      status:        form.status,
+      status:               form.status,
       report,
-      completed_at:  isConcluding ? concludedAt.toISOString() : null,
-      duration:      isConcluding && isOldestInGroup
-                       ? formatDuration(startAt, concludedAt)
-                       : null,
-      photo_url:     isConcluding ? photoUrl     : editableTicket.photo_url,
-      signature_url: isConcluding ? signatureUrl : editableTicket.signature_url,
+      completed_at:         isConcluding ? concludedAt.toISOString() : null,
+      duration:             isConcluding && isOldestInGroup
+                              ? formatDuration(startAt, concludedAt)
+                              : null,
+      photo_url:            isConcluding ? photoUrl     : editableTicket.photo_url,
+      diagnostic_photo_url: diagnosticPhotoUrl,
+      signature_url:        isConcluding ? signatureUrl : editableTicket.signature_url,
     }
     if (isConcluding) {
       updatePayload.resolution_notes = resolutionNotes

@@ -36,6 +36,7 @@ export interface Database {
           status: TicketStatus
           report: string | null
           photo_url: string | null
+          diagnostic_photo_url: string | null
           signature_url: string | null
           audio_url: string | null
           audio_transcription: string | null
@@ -64,6 +65,7 @@ export interface Database {
           status?: TicketStatus
           report?: string | null
           photo_url?: string | null
+          diagnostic_photo_url?: string | null
           signature_url?: string | null
           audio_url?: string | null
           audio_transcription?: string | null
@@ -92,6 +94,7 @@ export interface Database {
           status?: TicketStatus
           report?: string | null
           photo_url?: string | null
+          diagnostic_photo_url?: string | null
           signature_url?: string | null
           audio_url?: string | null
           audio_transcription?: string | null

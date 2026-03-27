@@ -280,8 +280,8 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
   // Local audio state — initialised from DB, cleared on delete, set on new upload
   const [localAudioUrl,         setLocalAudioUrl]         = useState(ticket.audio_url)
   const [localResAudioUrl,      setLocalResAudioUrl]      = useState(ticket.resolution_audio_url)
-  const [localAudioTranscript,  setLocalAudioTranscript]  = useState<string | null>(ticket.audio_transcription ?? null)
-  const [localResTranscript,    setLocalResTranscript]    = useState<string | null>(ticket.resolution_audio_transcription ?? null)
+  const localAudioTranscript = ticket.audio_transcription ?? null
+  const localResTranscript   = ticket.resolution_audio_transcription ?? null
   const [deletingAudio,         setDeletingAudio]         = useState<'audio_url' | 'resolution_audio_url' | null>(null)
 
   async function handleDeleteAudio(column: 'audio_url' | 'resolution_audio_url', url: string) {

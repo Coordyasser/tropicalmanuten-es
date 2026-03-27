@@ -93,8 +93,8 @@ export default function AtenderTicketModal({ ticket, onClose, onSuccess }: Atend
   })
   const [localAudioUrl,        setLocalAudioUrl]        = useState(ticket.audio_url ?? null)
   const [localResAudioUrl,     setLocalResAudioUrl]     = useState(ticket.resolution_audio_url ?? null)
-  const [localAudioTranscript, setLocalAudioTranscript] = useState<string | null>(ticket.audio_transcription ?? null)
-  const [localResTranscript,   setLocalResTranscript]   = useState<string | null>(ticket.resolution_audio_transcription ?? null)
+  const localAudioTranscript = ticket.audio_transcription ?? null
+  const localResTranscript   = ticket.resolution_audio_transcription ?? null
   const [submitting,  setSubmitting]  = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 

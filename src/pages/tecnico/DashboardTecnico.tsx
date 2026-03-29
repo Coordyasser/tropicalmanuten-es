@@ -34,7 +34,7 @@ function groupTickets(tickets: TicketWithRelations[]): TicketGroup[] {
   const map = new Map<string, TicketGroup>()
   // tickets already sorted newest first when called
   for (const t of tickets) {
-    const key = `${t.project_id}|${t.bloco ?? ''}|${t.unidade ?? ''}`
+    const key = `${t.project_id}|${t.bloco ?? ''}|${t.unidade ?? ''}|${t.os_number ?? ''}`
     if (!map.has(key)) {
       map.set(key, {
         key,
@@ -198,9 +198,9 @@ export default function DashboardTecnico() {
 
   // ── Navigation ───────────────────────────────────────────────────────────
   function getLocationTickets(ticket: TicketWithRelations): TicketWithRelations[] {
-    const key = `${ticket.project_id}|${ticket.bloco ?? ''}|${ticket.unidade ?? ''}`
+    const key = `${ticket.project_id}|${ticket.bloco ?? ''}|${ticket.unidade ?? ''}|${ticket.os_number ?? ''}`
     return [...tickets]
-      .filter(t => `${t.project_id}|${t.bloco ?? ''}|${t.unidade ?? ''}` === key)
+      .filter(t => `${t.project_id}|${t.bloco ?? ''}|${t.unidade ?? ''}|${t.os_number ?? ''}` === key)
       .sort(sortDesc)
   }
 

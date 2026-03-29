@@ -602,7 +602,15 @@ export default function BaixaTicket() {
     const m = new Map<string, TicketForm>()
     for (const t of state?.tickets ?? []) {
       const initial: TicketStatus = t.status === 'aberto' ? 'concluido' : t.status
-      m.set(t.id, { status: initial, observacao: '', changed: false, photoFile: null, photoPreview: null, diagnosticPhotoFile: null, diagnosticPhotoPreview: null })
+      m.set(t.id, {
+        status: initial,
+        observacao: '',
+        changed: false,
+        photoFile: null,
+        photoPreview: t.photo_url ?? null,
+        diagnosticPhotoFile: null,
+        diagnosticPhotoPreview: t.diagnostic_photo_url ?? null,
+      })
     }
     return m
   })
@@ -665,7 +673,8 @@ export default function BaixaTicket() {
     const isOldestInGroup = olderPending.length === 0
 
     // ── Diagnostic photo upload ───────────────────────────────────────────
-    let diagnosticPhotoUrl: string | null = editableTicket.diagnostic_photo_url
+    // form.diagnosticPhotoPreview: DB URL (unchanged) | blob (new) | null (removed)
+    let diagnosticPhotoUrl: string | null = form.diagnosticPhotoPreview
     if (!isConcluding && form.diagnosticPhotoFile) {
       const ext  = (form.diagnosticPhotoFile.name.split('.').pop() ?? 'jpg').split('?')[0]
       const path = `tickets/${editableTicket.id}/diagnostic_photo.${ext}`
@@ -677,7 +686,8 @@ export default function BaixaTicket() {
     }
 
     // ── Photo upload ──────────────────────────────────────────────────────
-    let photoUrl: string | null = editableTicket.photo_url
+    // form.photoPreview: DB URL (unchanged) | blob (new) | null (removed)
+    let photoUrl: string | null = form.photoPreview
     if (isConcluding && form.photoFile) {
       const ext  = (form.photoFile.name.split('.').pop() ?? 'jpg').split('?')[0]
       const path = `tickets/${editableTicket.id}/photo.${ext}`

@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Loader2, AlertCircle, Wrench } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Login() {
-  const { signIn, role } = useAuth()
+  const { signIn, role, loading: authLoading } = useAuth()
   const navigate = useNavigate()
 
   const [email,    setEmail]    = useState('')
@@ -13,8 +13,12 @@ export default function Login() {
   const [error,    setError]    = useState<string | null>(null)
   const [loading,  setLoading]  = useState(false)
 
-  if (role === 'admin')   { navigate('/admin',   { replace: true }); return null }
-  if (role === 'tecnico') { navigate('/tecnico', { replace: true }); return null }
+  useEffect(() => {
+    if (role === 'admin')   navigate('/admin',   { replace: true })
+    if (role === 'tecnico') navigate('/tecnico', { replace: true })
+  }, [role, navigate])
+
+  if (authLoading || role) return null
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()

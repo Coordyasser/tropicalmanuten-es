@@ -115,12 +115,13 @@ export default function NovoTicketModal({ open, onClose, onSuccess, initialData 
         description: description.trim(),
         initialProvision: form.initialProvision.trim() || null,
       }
-      generateAndUploadOs(osData).then(url => {
-        if (url) supabase.from('tickets').update({ os_pdf_url: url }).eq('id', inserted.id).then()
-      })
-      categorizeTicket(description.trim()).then(categoria =>
-        supabase.from('tickets').update({ categoria }).eq('id', inserted.id).then()
-      )
+      const [url] = await Promise.all([
+        generateAndUploadOs(osData),
+        categorizeTicket(description.trim()).then(categoria =>
+          supabase.from('tickets').update({ categoria }).eq('id', inserted.id)
+        ),
+      ])
+      if (url) await supabase.from('tickets').update({ os_pdf_url: url }).eq('id', inserted.id)
     }
 
     setSubmitting(false); onSuccess(); onClose()

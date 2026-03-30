@@ -22,6 +22,15 @@ async function fetchBase64(url: string): Promise<string | null> {
   }
 }
 
+function getImageDimensions(dataUrl: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight })
+    img.onerror = () => resolve({ w: 3, h: 2 })
+    img.src = dataUrl
+  })
+}
+
 async function logoAsBase64(): Promise<string | null> {
   return fetchBase64('/logo%20tropical.jpg.jpeg')
 }
@@ -108,11 +117,10 @@ export async function generateTicketReport(ticket: AdminTicket): Promise<void> {
     y += boxH + 4
   }
 
-  function addImage(dataUrl: string, label: string) {
-    const mime  = mimeFromDataUrl(dataUrl)
-    const maxW  = Math.min(CW, 120)
-    // Estimate aspect; default to 3:2 if we can't measure
-    const imgH  = 65
+  async function addImage(dataUrl: string, label: string, maxW = Math.min(CW, 120)) {
+    const mime = mimeFromDataUrl(dataUrl)
+    const { w: natW, h: natH } = await getImageDimensions(dataUrl)
+    const imgH = natW > 0 ? (maxW * natH) / natW : 65
     ensureSpace(imgH + 14)
     doc.setFontSize(7.5)
     doc.setFont('helvetica', 'bold')
@@ -127,6 +135,34 @@ export async function generateTicketReport(ticket: AdminTicket): Promise<void> {
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(...MUTED)
       doc.text('[Imagem não disponível]', L + 2, y, { baseline: 'top' })
+      y += 8
+    }
+  }
+
+  async function addSignature(dataUrl: string, label: string) {
+    const mime = mimeFromDataUrl(dataUrl)
+    const { w: natW, h: natH } = await getImageDimensions(dataUrl)
+    // Limita a largura da assinatura a 80mm e calcula a altura proporcional
+    const sigW = Math.min(80, CW)
+    const sigH = natW > 0 ? (sigW * natH) / natW : 25
+    ensureSpace(sigH + 14)
+    doc.setFontSize(7.5)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(...DARK)
+    doc.text(`${label}:`, L + 2, y, { baseline: 'top' })
+    y += 5.5
+    // Fundo cinza claro para a área da assinatura
+    doc.setFillColor(...LIGHT_BG)
+    doc.setDrawColor(...BORDER)
+    doc.rect(L, y, sigW + 4, sigH + 4, 'FD')
+    try {
+      doc.addImage(dataUrl, mime, L + 2, y + 2, sigW, sigH, undefined, 'FAST')
+      y += sigH + 4 + 5
+    } catch {
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(...MUTED)
+      doc.text('[Assinatura não disponível]', L + 2, y, { baseline: 'top' })
       y += 8
     }
   }
@@ -182,15 +218,15 @@ export async function generateTicketReport(ticket: AdminTicket): Promise<void> {
   sectionHeader('DIAGNÓSTICO')
   textBox('Observações do técnico', ticket.report)
   textBox('Transcrição do áudio de diagnóstico', ticket.audio_transcription)
-  if (diagPhotoData) addImage(diagPhotoData, 'Foto do diagnóstico')
+  if (diagPhotoData) await addImage(diagPhotoData, 'Foto do diagnóstico')
 
   // ── CONCLUSÃO ────────────────────────────────────────────────────────────
   if (ticket.status === 'concluido' || ticket.resolution_notes) {
     sectionHeader('CONCLUSÃO')
     textBox('Relatório final', ticket.resolution_notes)
     textBox('Transcrição do áudio de conclusão', ticket.resolution_audio_transcription)
-    if (photoData) addImage(photoData, 'Foto da conclusão')
-    if (signatureData) addImage(signatureData, 'Assinatura do cliente')
+    if (photoData) await addImage(photoData, 'Foto da conclusão')
+    if (signatureData) await addSignature(signatureData, 'Assinatura do cliente')
   }
 
   // ── Download ─────────────────────────────────────────────────────────────

@@ -123,7 +123,23 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
     if (!ticket) return
     setGeneratingPdf(true)
     try {
-      await generateTicketReport(ticket)
+      // Busca dados frescos para garantir que audio_transcription está atualizado
+      const { data } = await supabase
+        .from('tickets')
+        .select(`
+          id, project_id, tech_id, scheduled_date, scheduled_time,
+          description, unidade, bloco, categoria,
+          status, report, photo_url, diagnostic_photo_url, signature_url,
+          audio_url, audio_transcription,
+          resolution_notes, resolution_audio_url, resolution_audio_transcription,
+          client_name, client_phone, complaint_channel, initial_provision,
+          os_number, os_pdf_url,
+          project:projects ( name ),
+          technician:profiles ( id, name )
+        `)
+        .eq('id', ticket.id)
+        .single()
+      await generateTicketReport((data ?? ticket) as AdminTicket)
     } finally {
       setGeneratingPdf(false)
     }

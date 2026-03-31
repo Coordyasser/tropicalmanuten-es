@@ -191,7 +191,7 @@ export default function CalendarioAdmin({ tickets, loading, onVerTicket }: Calen
             </div>
 
             {/* ── Weekday labels ── */}
-            <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50">
+            <div className="grid grid-cols-7 border-b border-slate-300 bg-slate-50">
               {WEEKDAYS.map(d => (
                 <div key={d} className="py-2.5 text-center text-xs font-semibold text-slate-400 uppercase tracking-wide">
                   {d}
@@ -205,7 +205,7 @@ export default function CalendarioAdmin({ tickets, loading, onVerTicket }: Calen
                 Carregando chamados...
               </div>
             ) : (
-              <div className="grid grid-cols-7 divide-x divide-slate-100">
+              <div className="grid grid-cols-7 divide-x divide-slate-300">
                 {days.map((day, idx) => {
                   const dayTickets     = ticketsForDay(day)
                   const isCurrentMonth = isSameMonth(day, currentMonth)
@@ -220,7 +220,7 @@ export default function CalendarioAdmin({ tickets, loading, onVerTicket }: Calen
                       key={idx}
                       onClick={() => handleDayClick(day, dayTickets)}
                       className={[
-                        'min-h-[100px] p-2 border-b border-slate-100 flex flex-col gap-1',
+                        'min-h-[100px] p-2 border-b border-slate-300 flex flex-col gap-1',
                         !isCurrentMonth ? 'bg-slate-50/60' : 'bg-white',
                         isLastCol ? 'border-r-0' : '',
                         hasTickets ? 'cursor-pointer hover:bg-blue-50/30 transition-colors' : '',

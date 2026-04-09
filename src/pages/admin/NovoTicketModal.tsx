@@ -199,7 +199,7 @@ export default function NovoTicketModal({ open, onClose, onSuccess, initialData 
             <div>
               <label className={labelCls}>Data agendada *</label>
               <input type="date" value={form.scheduledDate} onChange={set('scheduledDate')}
-                disabled={submitting} min={new Date().toISOString().split('T')[0]} className={inputCls} />
+                disabled={submitting} className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>Horario</label>

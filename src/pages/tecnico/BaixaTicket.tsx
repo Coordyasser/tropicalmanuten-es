@@ -157,16 +157,21 @@ interface AudioRecorderProps {
   onSaved: (url: string) => void
 }
 
+type MicErrorType = 'blocked' | 'notfound' | 'generic' | null
+
 export function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorderProps) {
   const [recording,  setRecording]  = useState(false)
   const [uploading,  setUploading]  = useState(false)
   const [error,      setError]      = useState<string | null>(null)
+  const [errorType,  setErrorType]  = useState<MicErrorType>(null)
   const mediaRef    = useRef<MediaRecorder | null>(null)
   const chunksRef   = useRef<Blob[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  function clearError() { setError(null); setErrorType(null) }
+
   async function startRecording() {
-    setError(null)
+    clearError()
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
@@ -177,8 +182,18 @@ export function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorder
       mr.start()
       mediaRef.current = mr
       setRecording(true)
-    } catch {
-      setError('Por favor, libere o acesso ao microfone nas configurações do navegador para gravar áudios.')
+    } catch (err) {
+      const domErr = err instanceof DOMException ? err.name : ''
+      if (domErr === 'NotAllowedError') {
+        setErrorType('blocked')
+        setError('Microfone bloqueado. Clique no ícone de cadeado (🔒) lá em cima na barra do navegador e mude a permissão do microfone para "Permitir".')
+      } else if (domErr === 'NotFoundError') {
+        setErrorType('notfound')
+        setError('Nenhum microfone encontrado neste dispositivo. Conecte um microfone e tente novamente.')
+      } else {
+        setErrorType('generic')
+        setError('Não foi possível acessar o microfone. Verifique as permissões do navegador.')
+      }
     }
   }
 
@@ -255,7 +270,24 @@ export function AudioRecorder({ ticketId, targetColumn, onSaved }: AudioRecorder
           <Paperclip className="w-4 h-4" />
         </button>
       </div>
-      {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+      {error && errorType === 'blocked' && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-300 rounded-xl px-4 py-3">
+          <Lock className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="text-sm font-bold text-amber-800">Microfone bloqueado</p>
+            <p className="text-xs text-amber-700 leading-relaxed">{error}</p>
+          </div>
+        </div>
+      )}
+      {error && errorType === 'notfound' && (
+        <div className="flex items-start gap-3 bg-slate-50 border border-slate-300 rounded-xl px-4 py-3">
+          <MicOff className="w-5 h-5 text-slate-500 shrink-0 mt-0.5" />
+          <p className="text-xs text-slate-600 leading-relaxed">{error}</p>
+        </div>
+      )}
+      {error && errorType === 'generic' && (
+        <p className="text-xs text-red-500 text-center">{error}</p>
+      )}
     </div>
   )
 }

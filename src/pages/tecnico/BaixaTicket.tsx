@@ -327,7 +327,9 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
   function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    onChange({ photoFile: file, photoPreview: URL.createObjectURL(file), changed: true })
+    const reader = new FileReader()
+    reader.onloadend = () => onChange({ photoFile: file, photoPreview: reader.result as string, changed: true })
+    reader.readAsDataURL(file)
   }
   function removePhoto() {
     onChange({ photoFile: null, photoPreview: null })
@@ -337,7 +339,9 @@ function TicketItem({ ticket, form, sigRef, onChange, isQueueLocked }: TicketIte
   function handleDiagPhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    onChange({ diagnosticPhotoFile: file, diagnosticPhotoPreview: URL.createObjectURL(file), changed: true })
+    const reader = new FileReader()
+    reader.onloadend = () => onChange({ diagnosticPhotoFile: file, diagnosticPhotoPreview: reader.result as string, changed: true })
+    reader.readAsDataURL(file)
   }
   function removeDiagPhoto() {
     onChange({ diagnosticPhotoFile: null, diagnosticPhotoPreview: null })

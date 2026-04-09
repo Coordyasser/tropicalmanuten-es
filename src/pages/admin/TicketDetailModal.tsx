@@ -31,14 +31,14 @@ function StatusBadge({ status }: { status: AdminTicket['status'] }) {
   )
 }
 
-function PhotoPreview({ url }: { url: string }) {
+function PhotoPreview({ url, label = 'Foto' }: { url: string; label?: string }) {
   const [error, setError] = useState(false)
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Camera className="w-4 h-4 text-slate-400" />
-          <span className="text-sm font-semibold text-slate-600">Foto</span>
+          <span className="text-sm font-semibold text-slate-600">{label}</span>
         </div>
         <a href={url} target="_blank" rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 transition-colors">
@@ -294,8 +294,9 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
             </div>
           )}
 
-          {/* Photo */}
-          {ticket.photo_url && <PhotoPreview url={ticket.photo_url} />}
+          {/* Photos */}
+          {ticket.diagnostic_photo_url && <PhotoPreview url={ticket.diagnostic_photo_url} label="Foto do diagnóstico" />}
+          {ticket.photo_url            && <PhotoPreview url={ticket.photo_url}            label="Foto da conclusão"   />}
 
           {/* Signature */}
           {ticket.signature_url && (

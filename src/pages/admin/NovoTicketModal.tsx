@@ -98,7 +98,6 @@ export default function NovoTicketModal({ open, onClose, onSuccess, initialData 
       .from('tickets').insert(payload).select('id').single()
     if (insertErr) { setError(insertErr.message); setSubmitting(false); return }
 
-    // Background tasks: categorize + generate OS PDF — do not block the UI
     if (inserted?.id) {
       const selectedProject = projects.find(p => p.id === projectId)
       const osData: OsData = {
@@ -115,16 +114,30 @@ export default function NovoTicketModal({ open, onClose, onSuccess, initialData 
         description: description.trim(),
         initialProvision: form.initialProvision.trim() || null,
       }
-      const [url] = await Promise.all([
+
+      // allSettled garante que categorize sempre roda, mesmo se o PDF falhar
+      const [pdfResult] = await Promise.allSettled([
         generateAndUploadOs(osData),
         categorizeTicket(description.trim()).then(categoria =>
           supabase.from('tickets').update({ categoria }).eq('id', inserted.id)
         ),
       ])
-      if (url) await supabase.from('tickets').update({ os_pdf_url: url }).eq('id', inserted.id)
-    }
 
-    setSubmitting(false); onSuccess(); onClose()
+      if (pdfResult.status === 'fulfilled') {
+        // Trava de segurança: só finaliza após o update com a URL ser confirmado
+        await supabase.from('tickets').update({ os_pdf_url: pdfResult.value }).eq('id', inserted.id)
+        setSubmitting(false); onSuccess(); onClose()
+      } else {
+        // PDF falhou: avisa o usuário mas não perde o chamado criado
+        const reason = pdfResult.reason instanceof Error ? pdfResult.reason.message : 'Erro desconhecido'
+        setSubmitting(false)
+        onSuccess() // atualiza a lista (ticket foi salvo)
+        setError(`Chamado criado, mas o PDF da O.S. não foi gerado: ${reason}. Acesse os detalhes do chamado para gerar novamente.`)
+        return // mantém o modal aberto para o usuário ver o aviso
+      }
+    } else {
+      setSubmitting(false); onSuccess(); onClose()
+    }
   }
 
   if (!open) return null

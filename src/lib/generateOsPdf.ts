@@ -255,26 +255,23 @@ export async function buildOsPdf(data: OsData): Promise<Blob> {
 
 // ── Upload ─────────────────────────────────────────────────────────────────────
 
-export async function generateAndUploadOs(data: OsData): Promise<string | null> {
-  try {
-    const blob = await buildOsPdf(data)
+// Lança erro em vez de retornar null — o chamador decide como tratar.
+export async function generateAndUploadOs(data: OsData): Promise<string> {
+  const blob = await buildOsPdf(data)
 
-    const projectSlug  = data.projectName.toUpperCase().replace(/\s+/g, '_')
-    const unidadeSlug  = data.unidade.replace(/\s+/g, '_')
-    const blocoSlug    = data.bloco ? `_${data.bloco.replace(/\s+/g, '_')}` : ''
-    const fileName = `${projectSlug}_${unidadeSlug}${blocoSlug}_N_DA_OS_${padOs(data.osNumber)}.pdf`
-    const path = `${data.ticketId}/${fileName}`
+  const projectSlug = data.projectName.toUpperCase().replace(/\s+/g, '_')
+  const unidadeSlug = data.unidade.replace(/\s+/g, '_')
+  const blocoSlug   = data.bloco ? `_${data.bloco.replace(/\s+/g, '_')}` : ''
+  const fileName = `${projectSlug}_${unidadeSlug}${blocoSlug}_N_DA_OS_${padOs(data.osNumber)}.pdf`
+  const path = `${data.ticketId}/${fileName}`
 
-    const { data: uploaded, error } = await supabase.storage
-      .from('os_pdfs')
-      .upload(path, blob, { contentType: 'application/pdf' })
+  // upsert:true evita conflito se a geração for tentada mais de uma vez
+  const { data: uploaded, error } = await supabase.storage
+    .from('os_pdfs')
+    .upload(path, blob, { contentType: 'application/pdf', upsert: true })
 
-    if (error) { console.error('Erro ao enviar OS PDF:', error.message); return null }
+  if (error) throw new Error(`Falha no upload do PDF: ${error.message}`)
 
-    const { data: urlData } = supabase.storage.from('os_pdfs').getPublicUrl(uploaded.path)
-    return urlData.publicUrl
-  } catch (e) {
-    console.error('Erro ao gerar OS PDF:', e)
-    return null
-  }
+  const { data: urlData } = supabase.storage.from('os_pdfs').getPublicUrl(uploaded.path)
+  return urlData.publicUrl
 }

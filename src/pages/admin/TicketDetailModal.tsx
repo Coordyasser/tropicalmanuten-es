@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { X, CalendarDays, ExternalLink, Loader2, MapPin, User, FileText, Camera, PenLine, Tag, Clock, Volume2, FileDown, Phone, MessageSquare, Hash } from 'lucide-react'
+import { X, CalendarDays, ExternalLink, Loader2, MapPin, User, FileText, Camera, PenLine, Tag, Clock, Volume2, FileDown, Phone, MessageSquare, Hash, AlertTriangle, RefreshCw } from 'lucide-react'
 import type { AdminTicket } from '../../hooks/useAdminTickets'
 import { transcribeAudio } from '../../lib/transcribeAudio'
 import { generateTicketReport } from '../../lib/generateReportPdf'
+import { generateAndUploadOs } from '../../lib/generateOsPdf'
 import { supabase } from '../../lib/supabase'
 
 interface TicketDetailModalProps {
@@ -115,9 +116,40 @@ function AudioWithTranscription({
 }
 
 export default function TicketDetailModal({ ticket, onClose }: TicketDetailModalProps) {
-  const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [generatingPdf,   setGeneratingPdf]   = useState(false)
+  const [regeningOs,      setRegeningOs]      = useState(false)
+  const [regenOsError,    setRegenOsError]    = useState<string | null>(null)
+  const [localOsPdfUrl,   setLocalOsPdfUrl]   = useState<string | null>(ticket?.os_pdf_url ?? null)
 
   if (!ticket) return null
+
+  async function handleRegenOsPdf() {
+    if (!ticket || ticket.os_number == null) return
+    setRegeningOs(true)
+    setRegenOsError(null)
+    try {
+      const url = await generateAndUploadOs({
+        ticketId:         ticket.id,
+        projectName:      ticket.project?.name      ?? '',
+        unidade:          ticket.unidade             ?? '',
+        bloco:            ticket.bloco               ?? null,
+        clientName:       ticket.client_name         ?? null,
+        clientPhone:      ticket.client_phone        ?? null,
+        osNumber:         ticket.os_number,
+        complaintChannel: ticket.complaint_channel   ?? null,
+        scheduledDate:    ticket.scheduled_date,
+        scheduledTime:    ticket.scheduled_time      ?? null,
+        description:      ticket.description,
+        initialProvision: ticket.initial_provision   ?? null,
+      })
+      await supabase.from('tickets').update({ os_pdf_url: url }).eq('id', ticket.id)
+      setLocalOsPdfUrl(url)
+    } catch (e) {
+      setRegenOsError(e instanceof Error ? e.message : 'Erro ao gerar PDF da O.S.')
+    } finally {
+      setRegeningOs(false)
+    }
+  }
 
   async function handleDownloadReport() {
     if (!ticket) return
@@ -340,14 +372,32 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
         </div>
 
         <div className="px-6 pb-6 flex flex-col gap-2">
+          {/* Alerta se regeneração falhou */}
+          {regenOsError && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+              <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-red-700 leading-relaxed">{regenOsError}</p>
+            </div>
+          )}
+
           <div className="flex gap-3">
-            {ticket.os_pdf_url && (
-              <a href={ticket.os_pdf_url} target="_blank" rel="noopener noreferrer"
+            {localOsPdfUrl ? (
+              <a href={localOsPdfUrl} target="_blank" rel="noopener noreferrer"
                 className="flex-1 py-2.5 rounded-xl bg-brand-red hover:bg-brand-red-dark text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2">
                 <FileDown className="w-4 h-4" />
                 Ver O.S.
               </a>
-            )}
+            ) : ticket.os_number != null ? (
+              <button
+                onClick={handleRegenOsPdf}
+                disabled={regeningOs}
+                className="flex-1 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {regeningOs
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Gerando O.S....</>
+                  : <><RefreshCw className="w-4 h-4" /> Gerar O.S.</>}
+              </button>
+            ) : null}
             <button onClick={onClose}
               className="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm font-medium">
               Fechar

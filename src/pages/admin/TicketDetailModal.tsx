@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, CalendarDays, ExternalLink, Loader2, MapPin, User, FileText, Camera, PenLine, Tag, Clock, Volume2, FileDown, Phone, MessageSquare, Hash, AlertTriangle, RefreshCw } from 'lucide-react'
 import type { AdminTicket } from '../../hooks/useAdminTickets'
 import { transcribeAudio } from '../../lib/transcribeAudio'
@@ -120,6 +120,11 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
   const [regeningOs,      setRegeningOs]      = useState(false)
   const [regenOsError,    setRegenOsError]    = useState<string | null>(null)
   const [localOsPdfUrl,   setLocalOsPdfUrl]   = useState<string | null>(ticket?.os_pdf_url ?? null)
+
+  // Sincroniza sempre que um ticket diferente for aberto ou os_pdf_url mudar no prop
+  useEffect(() => {
+    setLocalOsPdfUrl(ticket?.os_pdf_url || null)
+  }, [ticket?.id, ticket?.os_pdf_url])
 
   if (!ticket) return null
 

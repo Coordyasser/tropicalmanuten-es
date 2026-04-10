@@ -255,13 +255,22 @@ export async function buildOsPdf(data: OsData): Promise<Blob> {
 
 // ── Upload ─────────────────────────────────────────────────────────────────────
 
+/** Remove acentos e caracteres não-ASCII para gerar paths válidos no Supabase Storage */
+function slugify(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')   // remove diacríticos (é→e, ã→a, etc.)
+    .replace(/[^a-zA-Z0-9_\-]/g, '_') // substitui qualquer outro char especial
+    .replace(/_+/g, '_')               // colapsa underscores duplicados
+}
+
 // Lança erro em vez de retornar null — o chamador decide como tratar.
 export async function generateAndUploadOs(data: OsData): Promise<string> {
   const blob = await buildOsPdf(data)
 
-  const projectSlug = data.projectName.toUpperCase().replace(/\s+/g, '_')
-  const unidadeSlug = data.unidade.replace(/\s+/g, '_')
-  const blocoSlug   = data.bloco ? `_${data.bloco.replace(/\s+/g, '_')}` : ''
+  const projectSlug = slugify(data.projectName.toUpperCase())
+  const unidadeSlug = slugify(data.unidade)
+  const blocoSlug   = data.bloco ? `_${slugify(data.bloco)}` : ''
   const fileName = `${projectSlug}_${unidadeSlug}${blocoSlug}_N_DA_OS_${padOs(data.osNumber)}.pdf`
   const path = `${data.ticketId}/${fileName}`
 

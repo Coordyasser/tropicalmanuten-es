@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import type { TicketStatus } from '../types/database'
+import type { TicketStatus, TicketType } from '../types/database'
 
 export interface TicketWithRelations {
   id: string
@@ -26,6 +26,7 @@ export interface TicketWithRelations {
   os_number: number | null
   os_pdf_url: string | null
   completed_at: string | null
+  ticket_type: TicketType | null
   project: { name: string } | null
 }
 
@@ -53,7 +54,7 @@ export function useTickets(): UseTicketsResult {
         description, unidade, bloco, categoria, status,
         report, photo_url, diagnostic_photo_url, signature_url, audio_url, audio_transcription,
         resolution_notes, resolution_audio_url, resolution_audio_transcription,
-        os_number, os_pdf_url, completed_at,
+        os_number, os_pdf_url, completed_at, ticket_type,
         project:projects ( name )
       `)
       .eq('tech_id', user.id)

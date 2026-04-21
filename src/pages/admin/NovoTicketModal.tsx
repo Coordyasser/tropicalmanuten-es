@@ -4,7 +4,7 @@ import { AlertCircle, Loader2, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useProjects } from '../../hooks/useProjects'
 import { useTecnicos } from '../../hooks/useTecnicos'
-import type { Database } from '../../types/database'
+import type { Database, TicketType } from '../../types/database'
 import { categorizeTicket } from '../../lib/categorizeTicket'
 import { generateAndUploadOs } from '../../lib/generateOsPdf'
 import type { OsData } from '../../lib/generateOsPdf'
@@ -20,11 +20,16 @@ interface NovoTicketModalProps {
 
 const COMPLAINT_CHANNELS = ['WhatsApp', 'Telefone', 'E-mail', 'Presencial'] as const
 
+const TICKET_TYPES: { value: TicketType; label: string }[] = [
+  { value: 'manutencao', label: 'Manutenção' },
+  { value: 'vistoria',   label: 'Vistoria'   },
+]
+
 const EMPTY = {
   projectId: '', techId: '', scheduledDate: '', scheduledTime: '',
   unidade: '', bloco: '', description: '',
   clientName: '', clientPhone: '', complaintChannel: '', initialProvision: '',
-  osNumber: '',
+  osNumber: '', ticketType: 'manutencao' as TicketType,
 }
 
 export default function NovoTicketModal({ open, onClose, onSuccess, initialData }: NovoTicketModalProps) {
@@ -92,6 +97,7 @@ export default function NovoTicketModal({ open, onClose, onSuccess, initialData 
       complaint_channel: form.complaintChannel || null,
       initial_provision: form.initialProvision.trim() || null,
       os_number: osNum,
+      ticket_type: form.ticketType,
     }
 
     const { data: inserted, error: insertErr } = await supabase
@@ -174,6 +180,31 @@ export default function NovoTicketModal({ open, onClose, onSuccess, initialData 
               <span>{error}</span>
             </div>
           )}
+
+          {/* Tipo de Chamado */}
+          <div>
+            <label className={labelCls}>Tipo de Chamado *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {TICKET_TYPES.map(tt => (
+                <button
+                  key={tt.value}
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setForm(f => ({ ...f, ticketType: tt.value }))}
+                  className={[
+                    'py-2.5 rounded-xl text-sm font-semibold border-2 transition-all',
+                    form.ticketType === tt.value
+                      ? tt.value === 'manutencao'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-teal-500 bg-teal-50 text-teal-700'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300',
+                  ].join(' ')}
+                >
+                  {tt.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Empreendimento */}
           <div>

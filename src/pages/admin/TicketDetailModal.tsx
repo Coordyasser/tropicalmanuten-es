@@ -284,6 +284,25 @@ export default function TicketDetailModal({ ticket, onClose }: TicketDetailModal
               </div>
             )}
 
+            {/* Tipo de Chamado */}
+            <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">
+              <Tag className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs text-slate-400 font-medium">Tipo de Chamado</p>
+                <span className={[
+                  'inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mt-0.5',
+                  ticket.ticket_type === 'vistoria'
+                    ? 'bg-teal-100 text-teal-700'
+                    : 'bg-blue-100 text-blue-700',
+                ].join(' ')}>
+                  <span className={['w-1.5 h-1.5 rounded-full',
+                    ticket.ticket_type === 'vistoria' ? 'bg-teal-500' : 'bg-blue-500',
+                  ].join(' ')} />
+                  {ticket.ticket_type === 'vistoria' ? 'Vistoria' : 'Manutenção'}
+                </span>
+              </div>
+            </div>
+
             {ticket.categoria && (
               <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">
                 <Tag className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />

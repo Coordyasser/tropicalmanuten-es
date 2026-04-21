@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useProjects } from '../../hooks/useProjects'
 import { useTecnicos } from '../../hooks/useTecnicos'
 import type { AdminTicket } from '../../hooks/useAdminTickets'
-import type { Database } from '../../types/database'
+import type { Database, TicketType } from '../../types/database'
 import { CATEGORIAS } from '../../lib/categorizeTicket'
 
 interface EditTicketModalProps {
@@ -13,6 +13,11 @@ interface EditTicketModalProps {
   onClose: () => void
   onSuccess: () => void
 }
+
+const TICKET_TYPES: { value: TicketType; label: string }[] = [
+  { value: 'manutencao', label: 'Manutenção' },
+  { value: 'vistoria',   label: 'Vistoria'   },
+]
 
 type FormState = {
   projectId: string
@@ -23,6 +28,7 @@ type FormState = {
   bloco: string
   categoria: string
   description: string
+  ticketType: TicketType
 }
 
 function ticketToForm(t: AdminTicket): FormState {
@@ -35,6 +41,7 @@ function ticketToForm(t: AdminTicket): FormState {
     bloco:         t.bloco          ?? '',
     categoria:     t.categoria      ?? '',
     description:   t.description    ?? '',
+    ticketType:    t.ticket_type    ?? 'manutencao',
   }
 }
 
@@ -74,6 +81,7 @@ export default function EditTicketModal({ ticket, onClose, onSuccess }: EditTick
       bloco:          form.bloco.trim() || null,
       categoria:      form.categoria.trim() || null,
       description:    description.trim(),
+      ticket_type:    form.ticketType,
     }
     const { error: updateErr } = await supabase.from('tickets').update(payload).eq('id', ticket.id)
     if (updateErr) { setError(updateErr.message); setSubmitting(false) }
@@ -109,6 +117,31 @@ export default function EditTicketModal({ ticket, onClose, onSuccess }: EditTick
               <span>{error}</span>
             </div>
           )}
+
+          {/* Tipo de Chamado */}
+          <div>
+            <label className={labelCls}>Tipo de Chamado *</label>
+            <div className="grid grid-cols-2 gap-2">
+              {TICKET_TYPES.map(tt => (
+                <button
+                  key={tt.value}
+                  type="button"
+                  disabled={submitting}
+                  onClick={() => setForm(f => f ? { ...f, ticketType: tt.value } : f)}
+                  className={[
+                    'py-2.5 rounded-xl text-sm font-semibold border-2 transition-all',
+                    form.ticketType === tt.value
+                      ? tt.value === 'manutencao'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-teal-500 bg-teal-50 text-teal-700'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300',
+                  ].join(' ')}
+                >
+                  {tt.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Empreendimento */}
           <div>

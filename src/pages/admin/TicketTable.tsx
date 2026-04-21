@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { ChevronDown, ChevronRight, Copy, Eye, Loader2, Pencil, RefreshCw, Search, Trash2, WifiOff, Wrench, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { AdminTicket } from '../../hooks/useAdminTickets'
-import type { TicketStatus } from '../../types/database'
+import type { TicketStatus, TicketType } from '../../types/database'
 import EditTicketModal from './EditTicketModal'
 
 interface TicketTableProps {
@@ -15,7 +15,8 @@ interface TicketTableProps {
   onRefresh: () => void
 }
 
-type Filter = 'all' | TicketStatus
+type Filter     = 'all' | TicketStatus
+type TypeFilter = 'all' | TicketType
 
 const FILTERS: { value: Filter; label: string }[] = [
   { value: 'all',       label: 'Todos'      },
@@ -23,6 +24,25 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'pendente',  label: 'Pendentes'  },
   { value: 'concluido', label: 'Concluidos' },
 ]
+
+const TYPE_FILTERS: { value: TypeFilter; label: string }[] = [
+  { value: 'all',        label: 'Todos os tipos' },
+  { value: 'manutencao', label: 'Manutenção'     },
+  { value: 'vistoria',   label: 'Vistoria'       },
+]
+
+function TicketTypeBadge({ type }: { type: TicketType | null }) {
+  const isVistoria = type === 'vistoria'
+  return (
+    <span className={[
+      'inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full',
+      isVistoria ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700',
+    ].join(' ')}>
+      <span className={['w-1.5 h-1.5 rounded-full', isVistoria ? 'bg-teal-500' : 'bg-blue-500'].join(' ')} />
+      {isVistoria ? 'Vistoria' : 'Manutenção'}
+    </span>
+  )
+}
 
 function formatDate(d: string): string { const [y,m,day]=d.split('-'); return `${day}/${m}/${y}` }
 function formatTime(t: string | null): string { return t ? t.slice(0, 5) : '' }
@@ -66,11 +86,15 @@ function groupTickets(tickets: AdminTicket[]): LocationGroup[] {
 function applyFilters(
   tickets: AdminTicket[],
   statusFilter: Filter,
+  typeFilter: TypeFilter,
   search: string,
   dateFrom: string,
   dateTo: string,
 ): AdminTicket[] {
   let result = statusFilter === 'all' ? tickets : tickets.filter(t => t.status === statusFilter)
+  if (typeFilter !== 'all') {
+    result = result.filter(t => (t.ticket_type ?? 'manutencao') === typeFilter)
+  }
 
   const q = search.trim().toLowerCase()
   if (q) {
@@ -91,6 +115,7 @@ function applyFilters(
 
 export default function TicketTable({ tickets, loading, error, onVerTicket, onDuplicarTicket, onAtenderTicket, onRefresh }: TicketTableProps) {
   const [filter,          setFilter]          = useState<Filter>('all')
+  const [typeFilter,      setTypeFilter]      = useState<TypeFilter>('all')
   const [search,          setSearch]          = useState('')
   const [dateFrom,        setDateFrom]        = useState('')
   const [dateTo,          setDateTo]          = useState('')
@@ -99,7 +124,7 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onDu
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deleting,        setDeleting]        = useState(false)
 
-  const filtered = applyFilters(tickets, filter, search, dateFrom, dateTo)
+  const filtered = applyFilters(tickets, filter, typeFilter, search, dateFrom, dateTo)
   const groups   = groupTickets(filtered)
 
   const hasExtraFilters = search.trim() !== '' || dateFrom !== '' || dateTo !== ''
@@ -182,27 +207,50 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onDu
         )}
       </div>
 
-      {/* ── Status pills + count ── */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
-          {FILTERS.map(f => (
-            <button key={f.value} onClick={() => setFilter(f.value)}
-              className={['px-4 py-1.5 rounded-lg text-sm font-medium transition-all',
-                filter === f.value ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700',
-              ].join(' ')}>
-              {f.label}
-              {f.value !== 'all' && (
-                <span className={['ml-1.5 text-xs font-bold px-1.5 py-0.5 rounded-full',
-                  f.value === 'aberto'   ? 'bg-slate-100 text-slate-600'
-                  : f.value === 'pendente' ? 'bg-orange-100 text-orange-600'
-                  : 'bg-emerald-100 text-emerald-600',
+      {/* ── Status pills + tipo + count ── */}
+      <div className="flex flex-wrap items-center gap-2 justify-between">
+        <div className="flex flex-wrap gap-2">
+          {/* Status */}
+          <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+            {FILTERS.map(f => (
+              <button key={f.value} onClick={() => setFilter(f.value)}
+                className={['px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
+                  filter === f.value ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700',
                 ].join(' ')}>
-                  {tickets.filter(t => t.status === f.value).length}
-                </span>
-              )}
-            </button>
-          ))}
+                {f.label}
+                {f.value !== 'all' && (
+                  <span className={['ml-1.5 text-xs font-bold px-1.5 py-0.5 rounded-full',
+                    f.value === 'aberto'   ? 'bg-slate-100 text-slate-600'
+                    : f.value === 'pendente' ? 'bg-orange-100 text-orange-600'
+                    : 'bg-emerald-100 text-emerald-600',
+                  ].join(' ')}>
+                    {tickets.filter(t => t.status === f.value).length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Tipo */}
+          <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+            {TYPE_FILTERS.map(tf => (
+              <button key={tf.value} onClick={() => setTypeFilter(tf.value)}
+                className={['px-3 py-1.5 rounded-lg text-sm font-medium transition-all',
+                  typeFilter === tf.value ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+                ].join(' ')}>
+                {tf.label}
+                {tf.value !== 'all' && (
+                  <span className={['ml-1.5 text-xs font-bold px-1.5 py-0.5 rounded-full',
+                    tf.value === 'manutencao' ? 'bg-blue-100 text-blue-600' : 'bg-teal-100 text-teal-600',
+                  ].join(' ')}>
+                    {tickets.filter(t => (t.ticket_type ?? 'manutencao') === tf.value).length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
+
         <div className="flex items-center gap-3 text-sm text-slate-400">
           <span>{filtered.length} registro{filtered.length !== 1 ? 's' : ''}</span>
           <button onClick={onRefresh} title="Atualizar"
@@ -330,7 +378,10 @@ export default function TicketTable({ tickets, loading, error, onVerTicket, onDu
                           {ticket.technician?.name ?? '—'}
                         </td>
                         <td className="px-4 py-2.5">
-                          <StatusBadge status={ticket.status} />
+                          <div className="flex flex-col gap-1">
+                            <StatusBadge status={ticket.status} />
+                            <TicketTypeBadge type={ticket.ticket_type} />
+                          </div>
                         </td>
                         <td className="px-4 py-2.5 text-center">
                           {confirmDeleteId === ticket.id ? (

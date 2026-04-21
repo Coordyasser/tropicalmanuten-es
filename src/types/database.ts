@@ -1,5 +1,6 @@
 export type Role = 'admin' | 'tecnico'
 export type TicketStatus = 'aberto' | 'pendente' | 'concluido'
+export type TicketType = 'manutencao' | 'vistoria'
 
 export interface Database {
   public: {
@@ -51,6 +52,7 @@ export interface Database {
           initial_provision: string | null
           os_number: number | null
           os_pdf_url: string | null
+          ticket_type: TicketType | null
         }
         Insert: {
           id?: string
@@ -80,6 +82,7 @@ export interface Database {
           initial_provision?: string | null
           os_number?: number | null
           os_pdf_url?: string | null
+          ticket_type?: TicketType | null
         }
         Update: {
           id?: string
@@ -109,13 +112,14 @@ export interface Database {
           initial_provision?: string | null
           os_number?: number | null
           os_pdf_url?: string | null
+          ticket_type?: TicketType | null
         }
         Relationships: []
       }
     }
     Views: { [_ in never]: never }
     Functions: { [_ in never]: never }
-    Enums: { role: Role; ticket_status: TicketStatus }
+    Enums: { role: Role; ticket_status: TicketStatus; ticket_type: TicketType }
     CompositeTypes: { [_ in never]: never }
   }
 }

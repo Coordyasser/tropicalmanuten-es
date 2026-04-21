@@ -243,13 +243,17 @@ export default function CalendarioTecnico({ tickets, loading, onVerTicket }: Cal
                             key={t.id}
                             title={ticketLabel(t)}
                             className={[
-                              'w-full text-[10px] font-medium px-1 py-[2px] rounded truncate leading-tight',
-                              t.status === 'concluido'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : t.status === 'pendente'
-                                  ? 'bg-orange-100 text-orange-800'
-                                  : 'bg-blue-100 text-blue-800',
+                              'w-full text-[10px] font-medium px-1 py-[2px] rounded truncate leading-tight flex items-center gap-0.5',
+                              t.ticket_type === 'vistoria'
+                                ? 'bg-teal-100 text-teal-800'
+                                : 'bg-blue-100 text-blue-800',
                             ].join(' ')}>
+                            <span className={[
+                              'w-1.5 h-1.5 rounded-full shrink-0',
+                              t.status === 'concluido' ? 'bg-emerald-500'
+                              : t.status === 'pendente' ? 'bg-orange-500'
+                              : 'bg-slate-400',
+                            ].join(' ')} />
                             {ticketLabel(t)}
                           </div>
                         ))}

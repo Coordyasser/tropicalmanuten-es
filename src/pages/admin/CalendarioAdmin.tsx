@@ -247,13 +247,17 @@ export default function CalendarioAdmin({ tickets, loading, onVerTicket }: Calen
                             key={t.id}
                             title={ticketLabel(t)}
                             className={[
-                              'w-full text-left text-[11px] font-medium px-1.5 py-[3px] rounded-md truncate leading-tight',
-                              t.status === 'concluido'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : t.status === 'pendente'
-                                  ? 'bg-orange-100 text-orange-800'
-                                  : 'bg-blue-100 text-blue-800',
+                              'w-full text-left text-[11px] font-medium px-1.5 py-[3px] rounded-md truncate leading-tight flex items-center gap-1',
+                              t.ticket_type === 'vistoria'
+                                ? 'bg-teal-100 text-teal-800'
+                                : 'bg-blue-100 text-blue-800',
                             ].join(' ')}>
+                            <span className={[
+                              'w-1.5 h-1.5 rounded-full shrink-0',
+                              t.status === 'concluido' ? 'bg-emerald-500'
+                              : t.status === 'pendente' ? 'bg-orange-500'
+                              : 'bg-slate-400',
+                            ].join(' ')} />
                             {ticketLabel(t)}
                           </div>
                         ))}
@@ -275,17 +279,22 @@ export default function CalendarioAdmin({ tickets, loading, onVerTicket }: Calen
         </div>{/* end overflow-x-auto */}
 
         {/* ── Legend ── */}
-        <div className="flex items-center gap-4 px-6 py-3 border-t border-slate-100 bg-slate-50/50">
-          {[
-            { label: 'Aberto',    bg: 'bg-blue-100',    text: 'text-blue-800'    },
-            { label: 'Pendente',  bg: 'bg-orange-100',  text: 'text-orange-800'  },
-            { label: 'Concluido', bg: 'bg-emerald-100', text: 'text-emerald-800' },
-          ].map(l => (
-            <div key={l.label} className="flex items-center gap-1.5">
-              <span className={`w-3 h-3 rounded-sm ${l.bg}`} />
-              <span className={`text-xs font-medium ${l.text}`}>{l.label}</span>
+        <div className="flex items-center gap-4 px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm bg-blue-100" />
+              <span className="text-xs font-medium text-blue-800">Manutenção</span>
             </div>
-          ))}
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm bg-teal-100" />
+              <span className="text-xs font-medium text-teal-800">Vistoria</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
+            <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-400" /><span className="text-xs text-slate-500">Aberto</span></div>
+            <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500" /><span className="text-xs text-slate-500">Pendente</span></div>
+            <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /><span className="text-xs text-slate-500">Concluído</span></div>
+          </div>
           <span className="ml-auto text-xs text-slate-400">Clique no dia para ver todos</span>
         </div>
       </div>

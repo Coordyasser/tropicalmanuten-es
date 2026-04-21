@@ -7,7 +7,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { useTickets } from '../../hooks/useTickets'
 import type { TicketWithRelations } from '../../hooks/useTickets'
-import type { TicketStatus } from '../../types/database'
+import type { TicketStatus, TicketType } from '../../types/database'
 import CalendarioTecnico from './CalendarioTecnico'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -63,6 +63,14 @@ function groupTickets(tickets: TicketWithRelations[]): TicketGroup[] {
 function formatDate(d: string): string {
   const [, m, day] = d.split('-')
   return `${day}/${m}`
+}
+
+// ── TicketTypeBadge ───────────────────────────────────────────────────────────
+function TicketTypeBadge({ type }: { type: TicketType | null }) {
+  if (!type) return null
+  return type === 'vistoria'
+    ? <span className="inline-flex items-center text-[10px] font-semibold bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">Vistoria</span>
+    : <span className="inline-flex items-center text-[10px] font-semibold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Manutenção</span>
 }
 
 // ── GroupCard ─────────────────────────────────────────────────────────────────
@@ -135,6 +143,7 @@ function GroupCard({
               {group.counts.concluido} Concluido{group.counts.concluido > 1 ? 's' : ''}
             </span>
           )}
+          <TicketTypeBadge type={mostRecent?.ticket_type ?? null} />
           <span className="text-[11px] text-slate-400 flex items-center gap-1 ml-auto">
             <Clock className="w-3 h-3" />
             {formatDate(group.latestDate)}

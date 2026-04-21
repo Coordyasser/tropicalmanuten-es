@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { TicketStatus } from '../types/database'
+import type { TicketStatus, TicketType } from '../types/database'
 
 export interface AdminTicket {
   id: string
@@ -28,6 +28,7 @@ export interface AdminTicket {
   initial_provision: string | null
   os_number: number | null
   os_pdf_url: string | null
+  ticket_type: TicketType | null
   project: { name: string } | null
   technician: { id: string; name: string } | null
 }
@@ -55,7 +56,7 @@ export function useAdminTickets(): UseAdminTicketsResult {
         status, report, photo_url, diagnostic_photo_url, signature_url, audio_url, audio_transcription,
         resolution_notes, resolution_audio_url, resolution_audio_transcription,
         client_name, client_phone, complaint_channel, initial_provision,
-        os_number, os_pdf_url,
+        os_number, os_pdf_url, ticket_type,
         project:projects ( name ),
         technician:profiles ( id, name )
       `)

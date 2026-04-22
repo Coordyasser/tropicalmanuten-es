@@ -57,6 +57,7 @@ export default function NovoTicketModal({ open, onClose, onSuccess, initialData 
         complaintChannel: initialData.complaint_channel ?? '',
         initialProvision: initialData.initial_provision ?? '',
         osNumber:         '',
+        ticketType:       initialData.ticket_type ?? 'manutencao',
       })
       setError(null)
     }

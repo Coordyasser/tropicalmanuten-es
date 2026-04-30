@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths,
@@ -6,6 +6,7 @@ import {
 import { ptBR } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight, X, MapPin, User, Tag } from 'lucide-react'
 import type { AdminTicket } from '../../hooks/useAdminTickets'
+import type { TicketStatus } from '../../types/database'
 
 interface CalendarioAdminProps {
   tickets: AdminTicket[]
@@ -133,10 +134,51 @@ function DayTicketsModal({ day, tickets, onClose, onVerTicket }: DayTicketsModal
   )
 }
 
+// ── Status filter config ──────────────────────────────────────────────────────
+const STATUS_FILTERS: { value: TicketStatus; label: string; dot: string; active: string; inactive: string }[] = [
+  {
+    value:    'aberto',
+    label:    'Em aberto',
+    dot:      'bg-slate-400',
+    active:   'bg-slate-100 text-slate-700 border-slate-300',
+    inactive: 'bg-white text-slate-400 border-slate-200',
+  },
+  {
+    value:    'pendente',
+    label:    'Pendente',
+    dot:      'bg-orange-400',
+    active:   'bg-orange-50 text-orange-700 border-orange-300',
+    inactive: 'bg-white text-slate-400 border-slate-200',
+  },
+  {
+    value:    'concluido',
+    label:    'Concluído',
+    dot:      'bg-emerald-500',
+    active:   'bg-emerald-50 text-emerald-700 border-emerald-300',
+    inactive: 'bg-white text-slate-400 border-slate-200',
+  },
+]
+
 // ── CalendarioAdmin ───────────────────────────────────────────────────────────
 export default function CalendarioAdmin({ tickets, loading, onVerTicket }: CalendarioAdminProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [dayModal, setDayModal]         = useState<{ day: Date; tickets: AdminTicket[] } | null>(null)
+  const [activeStatuses, setActiveStatuses] = useState<Set<TicketStatus>>(
+    new Set(['aberto', 'pendente'])
+  )
+
+  function toggleStatus(s: TicketStatus) {
+    setActiveStatuses(prev => {
+      const next = new Set(prev)
+      next.has(s) ? next.delete(s) : next.add(s)
+      return next
+    })
+  }
+
+  const filteredTickets = useMemo(
+    () => tickets.filter(t => activeStatuses.has(t.status)),
+    [tickets, activeStatuses]
+  )
 
   const monthStart = startOfMonth(currentMonth)
   const monthEnd   = endOfMonth(currentMonth)
@@ -147,7 +189,7 @@ export default function CalendarioAdmin({ tickets, loading, onVerTicket }: Calen
 
   function ticketsForDay(day: Date): AdminTicket[] {
     const iso = format(day, 'yyyy-MM-dd')
-    return tickets.filter(t => t.scheduled_date === iso)
+    return filteredTickets.filter(t => t.scheduled_date === iso)
   }
 
   function handleDayClick(day: Date, dayTickets: AdminTicket[]) {
@@ -188,6 +230,34 @@ export default function CalendarioAdmin({ tickets, loading, onVerTicket }: Calen
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
+            </div>
+
+            {/* ── Status filters ── */}
+            <div className="flex items-center gap-2 px-6 py-2.5 border-b border-slate-100 bg-slate-50/40 flex-wrap">
+              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wide mr-1">Filtrar:</span>
+              {STATUS_FILTERS.map(f => (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => toggleStatus(f.value)}
+                  className={[
+                    'inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-all',
+                    activeStatuses.has(f.value) ? f.active : f.inactive,
+                  ].join(' ')}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeStatuses.has(f.value) ? f.dot : 'bg-slate-300'}`} />
+                  {f.label}
+                  <span className={[
+                    'text-[10px] font-bold px-1 py-px rounded-full ml-0.5',
+                    activeStatuses.has(f.value) ? 'bg-white/70' : 'bg-slate-100 text-slate-400',
+                  ].join(' ')}>
+                    {tickets.filter(t => t.status === f.value).length}
+                  </span>
+                </button>
+              ))}
+              {activeStatuses.size === 0 && (
+                <span className="text-[11px] text-slate-400 italic ml-1">Nenhum status selecionado</span>
+              )}
             </div>
 
             {/* ── Weekday labels ── */}
